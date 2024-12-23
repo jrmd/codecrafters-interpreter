@@ -15,9 +15,9 @@ enum Value {
 impl fmt::Display for Value {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            Value::Str(val) => write!(f, "\"{}\"", val),
-            Value::Int(val) => write!(f, "\"{}\"", val),
-            Value::Float(val) => write!(f, "\"{}\"", val),
+            Value::Str(val) => write!(f, "{}", val),
+            Value::Int(val) => write!(f, "{}", val),
+            Value::Float(val) => write!(f, "{}", val),
             Value::Bool(val) => write!(f, "{}", if *val { "true" } else { "false" }),
             Value::Null => write!(f, "{}", String::from("null")),
         }
@@ -108,6 +108,7 @@ impl TokenType {
 enum LexerError {
     ParseError(usize, usize),
     UnexpectedToken(usize, usize, char),
+    UnterminatedString(usize, usize),
 }
 
 impl fmt::Display for LexerError {
@@ -115,6 +116,7 @@ impl fmt::Display for LexerError {
         match self {
             LexerError::ParseError(line, _) => write!(f, "[line {}] Error: Parse Error", line),
             LexerError::UnexpectedToken(line, _, ch) => write!(f, "[line {}] Error: Unexpected character: {}", line, ch),
+            LexerError::UnterminatedString(line, _) => write!(f, "[line {}] Error: Unterminated string", line),
         }
     }
 }
@@ -211,6 +213,34 @@ impl Lexer {
         self.input.chars().nth(self.index + 1)
     }
 
+    fn take_until(&mut self, ch: char) {
+        while let Some(curr) = self.peek() {
+            if ch != curr {
+                self.index += 1;
+                self.pos += 1;
+                continue;
+            }
+
+            break;
+        }
+    }
+
+    fn collect_until(&mut self, ch: char) -> Option<String> {
+        let from = self.index;
+        while let Some(curr) = self.peek() {
+            self.index += 1;
+            self.pos += 1;
+
+            if ch != curr {
+                continue;
+            }
+
+            return Some(self.input[from..self.index+1].to_string())
+        }
+
+        None
+    }
+
     pub fn parse(&mut self) -> Result<(), LexerError> {
         let strlen = self.input.len();
 
@@ -274,18 +304,19 @@ impl Lexer {
                     if Some('/') == self.peek() {
                         self.index += 1;
                         self.pos += 1;
-                        while let Some(ch) = self.peek() {
-                            if ch != '\n' {
-                                self.index += 1;
-                                self.pos += 1;
-                                continue;
-                            }
-
-                            break;
-                        }
+                        self.take_until('\n');
                         None
                     } else {
                         Some(Token::new(TokenType::Slash, String::from("/"), Some(Value::Null)))
+                    }
+                }
+                Some('"') => {
+                    if let Some(val) = self.collect_until('"') {
+                        let inner = val.clone()[1..val.len() - 1].to_string();
+                        Some(Token::new(TokenType::Str, val, Some(Value::Str(inner))))
+                    } else {
+                        self.report_error(LexerError::UnterminatedString(self.line, self.pos));
+                        None
                     }
                 }
                 Some(ch) => {
