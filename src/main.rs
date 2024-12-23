@@ -246,6 +246,24 @@ impl Lexer {
                         Some(Token::new(TokenType::Bang, String::from("!"), Some(Value::Null)))
                     }
                 }
+                Some('>') => {
+                    if Some('=') == self.peek() {
+                        self.index += 1;
+                        self.pos += 1;
+                        Some(Token::new(TokenType::GreaterEqual, String::from(">="), Some(Value::Null)))
+                    } else {
+                        Some(Token::new(TokenType::Greater, String::from(">"), Some(Value::Null)))
+                    }
+                },
+                Some('<') => {
+                    if Some('=') == self.peek() {
+                        self.index += 1;
+                        self.pos += 1;
+                        Some(Token::new(TokenType::LessEqual, String::from("<="), Some(Value::Null)))
+                    } else {
+                        Some(Token::new(TokenType::Less, String::from("<"), Some(Value::Null)))
+                    }
+                },
                 None => Some(Token::new(TokenType::Eof, String::from(""), Some(Value::Null))),
                 Some(ch) => {
                     self.report_error(LexerError::UnexpectedToken(self.line, self.pos, ch));
