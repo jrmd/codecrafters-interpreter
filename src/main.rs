@@ -4,7 +4,7 @@ use std::fs;
 use std::io::{self, Write};
 use std::error::Error;
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 enum Value {
     Str(String),
     Int(i64),
@@ -24,7 +24,7 @@ impl fmt::Display for Value {
     }
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone)]
 enum TokenType {
     LeftParen,
     RightParen,
@@ -104,17 +104,17 @@ impl TokenType {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 enum LexerError {
-    ParseError,
-    UnexpectedToken(char),
+    ParseError(usize, usize),
+    UnexpectedToken(usize, usize, char),
 }
 
 impl fmt::Display for LexerError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            LexerError::ParseError => write!(f, "Parse Error"),
-            LexerError::UnexpectedToken(ch) => write!(f, "Unexpected character: {}", ch),
+            LexerError::ParseError(line, _) => write!(f, "[line {}] Error: Parse Error", line),
+            LexerError::UnexpectedToken(line, _, ch) => write!(f, "[line {}] Error: Unexpected character: {}", line, ch),
         }
     }
 }
@@ -125,7 +125,7 @@ impl std::error::Error for LexerError  {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 struct Token {
     token_type: TokenType,
     loxme: String,
@@ -167,6 +167,8 @@ struct Lexer {
     input: String,
     index: usize,
     line: usize,
+    pos: usize,
+    errors: Vec<LexerError>
 }
 
 impl Lexer {
@@ -176,6 +178,8 @@ impl Lexer {
             input,
             index: 0,
             line: 1,
+            pos: 0,
+            errors: Vec::<LexerError>::new(),
         }
     }
 
@@ -183,6 +187,7 @@ impl Lexer {
         while let Some(ch) = self.input.chars().nth(self.index) {
             if ch == '\n' {
                 self.line += 1;
+                self.pos = 0;
             }
 
             if ch.is_whitespace() {
@@ -193,13 +198,16 @@ impl Lexer {
         }
     }
 
-    fn report_error(&self, err: LexerError) {
-        writeln!(io::stderr(), "[line {}] {}", self.line, err).unwrap();
+    fn report_error(&mut self, err: LexerError) {
+        writeln!(io::stderr(), "{}", err).unwrap();
+    }
+
+    fn has_error(&self) -> bool {
+        self.errors.len() > 0
     }
 
     pub fn parse(&mut self) -> Result<(), LexerError> {
         let strlen = self.input.len();
-        let mut err: Option<LexerError> = None;
 
         while self.index < strlen {
             self.take_whitespace();
@@ -217,8 +225,7 @@ impl Lexer {
                 Some(';') => Some(Token::new(TokenType::Semicolon, String::from(";"), Some(Value::Null))),
                 None => Some(Token::new(TokenType::Eof, String::from(""), Some(Value::Null))),
                 Some(ch) => {
-                    err = Some(LexerError::ParseError);
-                    self.report_error(LexerError::UnexpectedToken(ch));
+                    self.report_error(LexerError::UnexpectedToken(self.line, self.pos, ch));
                     None
                 },
             };
@@ -228,22 +235,19 @@ impl Lexer {
             }
 
             self.index += 1;
+            self.pos += 1;
         }
 
         if !self.tokens.last().is_some_and(|x| *x == TokenType::Eof) {
             self.tokens.push(Token::new(TokenType::Eof, String::from(""), Some(Value::Null)));
         }
 
-        if let Some(e) = err {
-            return Err(e);
-        }
-
         Ok(())
     }
-
-    pub fn dump(self) {
-        for token in self.tokens {
-           token.log();
+ 
+    pub fn dump(&self) {
+        for token in self.tokens.clone().into_iter() {
+            token.log();
         }
     }
 }
@@ -270,16 +274,12 @@ fn main() -> Result<(), Box<dyn Error>> {
 
             let mut lexer = Lexer::new(file_contents);
 
-            let res = lexer.parse();
-
+            let _ = lexer.parse();
             lexer.dump();
 
-            match res {
-                Err(LexerError::ParseError) => {
-                    std::process::exit(65);
-                },
-                _ => {},
-            };
+            if lexer.has_error() {
+                std::process::exit(65);
+            }
         }
         _ => {
             writeln!(io::stderr(), "Unknown command: {}", command).unwrap();
