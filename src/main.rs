@@ -353,7 +353,25 @@ impl Lexer {
                         Some(Token::new(TokenType::Number, number.clone(), Some(Value::Float(number.parse().unwrap()))))
                     } else if ch.is_alphabetic() || ch == '_' {
                         let ident = self.take_identifier();
-                        Some(Token::new(TokenType::Identifier, ident, Some(Value::Null)))
+                        let token_type = match ident.as_str() {
+                            "and" => TokenType::And,
+                            "class" => TokenType::Class,
+                            "else" => TokenType::Else,
+                            "false" => TokenType::False,
+                            "true" => TokenType::True,
+                            "for" => TokenType::For,
+                            "if" => TokenType::If,
+                            "nil" => TokenType::Nil,
+                            "or" => TokenType::Or,
+                            "print" => TokenType::Print,
+                            "return" => TokenType::Return,
+                            "super" => TokenType::Super,
+                            "this" => TokenType::This,
+                            "var" => TokenType::Var,
+                            "while" => TokenType::While,
+                            _ => TokenType::Identifier,
+                        };
+                        Some(Token::new(token_type, ident, Some(Value::Null)))
                     } else {
                         self.report_error(LexerError::UnexpectedToken(self.line, self.pos, ch));
                         None
