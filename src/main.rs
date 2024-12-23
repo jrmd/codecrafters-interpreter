@@ -207,6 +207,10 @@ impl Lexer {
         self.errors.len() > 0
     }
 
+    fn peek(&self) -> Option<char> {
+        self.input.chars().nth(self.index + 1)
+    }
+
     pub fn parse(&mut self) -> Result<(), LexerError> {
         let strlen = self.input.len();
 
@@ -224,6 +228,15 @@ impl Lexer {
                 Some('+') => Some(Token::new(TokenType::Plus, String::from("+"), Some(Value::Null))),
                 Some('-') => Some(Token::new(TokenType::Minus, String::from("-"), Some(Value::Null))),
                 Some(';') => Some(Token::new(TokenType::Semicolon, String::from(";"), Some(Value::Null))),
+                Some('=') => {
+                    if Some('=') == self.peek() {
+                        self.index += 1;
+                        self.pos += 1;
+                        Some(Token::new(TokenType::EqualEqual, String::from("=="), Some(Value::Null)))
+                    } else {
+                        Some(Token::new(TokenType::Equal, String::from("="), Some(Value::Null)))
+                    }
+                },
                 None => Some(Token::new(TokenType::Eof, String::from(""), Some(Value::Null))),
                 Some(ch) => {
                     self.report_error(LexerError::UnexpectedToken(self.line, self.pos, ch));
