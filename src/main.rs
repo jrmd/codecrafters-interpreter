@@ -64,7 +64,7 @@ impl TokenType {
             TokenType::LeftBrace => "LEFT_BRACE",
             TokenType::RightBrace => "RIGHT_BRACE",
             TokenType::Comma => "COMMA",
-            TokenType::Period => "PERIOD",
+            TokenType::Period => "DOT",
             TokenType::Minus => "MINUS",
             TokenType::Plus => "PLUS",
             TokenType::Semicolon => "SEMICOLON",
@@ -186,7 +186,6 @@ impl Lexer {
 
     pub fn parse(&mut self) -> Result<(), LexerError> {
         let strlen = self.input.len();
-        
         while self.index < strlen {
             self.take_whitespace();
 
@@ -195,6 +194,10 @@ impl Lexer {
                 Some(')') => Some(Token::new(TokenType::RightParen, String::from(")"), Some(Value::Null))),
                 Some('{') => Some(Token::new(TokenType::LeftBrace, String::from("{"), Some(Value::Null))),
                 Some('}') => Some(Token::new(TokenType::RightBrace, String::from("}"), Some(Value::Null))),
+                Some('*') => Some(Token::new(TokenType::Star, String::from("*"), Some(Value::Null))),
+                Some('.') => Some(Token::new(TokenType::Period, String::from("."), Some(Value::Null))),
+                Some(',') => Some(Token::new(TokenType::Comma, String::from(","), Some(Value::Null))),
+                Some('+') => Some(Token::new(TokenType::Plus, String::from("+"), Some(Value::Null))),
                 None => Some(Token::new(TokenType::Eof, String::from(""), Some(Value::Null))),
                 _ => None,
             };
