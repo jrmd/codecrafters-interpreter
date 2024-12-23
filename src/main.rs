@@ -264,6 +264,25 @@ impl Lexer {
                         Some(Token::new(TokenType::Less, String::from("<"), Some(Value::Null)))
                     }
                 },
+                Some('/') => {
+                    if Some('/') == self.peek() {
+                        self.index += 1;
+                        self.pos += 1;
+                        while let Some(ch) = self.peek() {
+                            if ch != '\n' {
+                                self.index += 1;
+                                self.pos += 1;
+                                continue;
+                            }
+
+                            break;
+                        }
+
+                        None
+                    } else {
+                        Some(Token::new(TokenType::Slash, String::from("/"), Some(Value::Null)))
+                    }
+                }
                 None => Some(Token::new(TokenType::Eof, String::from(""), Some(Value::Null))),
                 Some(ch) => {
                     self.report_error(LexerError::UnexpectedToken(self.line, self.pos, ch));
