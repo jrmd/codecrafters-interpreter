@@ -116,7 +116,7 @@ impl fmt::Display for LexerError {
         match self {
             LexerError::ParseError(line, _) => write!(f, "[line {}] Error: Parse Error", line),
             LexerError::UnexpectedToken(line, _, ch) => write!(f, "[line {}] Error: Unexpected character: {}", line, ch),
-            LexerError::UnterminatedString(line, _) => write!(f, "[line {}] Error: Unterminated string", line),
+            LexerError::UnterminatedString(line, _) => write!(f, "[line {}] Error: Unterminated string.", line),
         }
     }
 }
