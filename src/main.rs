@@ -258,7 +258,7 @@ impl Lexer {
     fn take_identifier(&mut self) -> String {
         let from = self.index;
         while let Some(ch) = self.peek() {
-            if ch != '_' && !ch.is_alphabetic() {
+            if ch != '_' && !ch.is_alphanumeric() {
                 break;
             }
 
