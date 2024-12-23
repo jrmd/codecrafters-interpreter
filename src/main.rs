@@ -255,6 +255,20 @@ impl Lexer {
         self.input[from..self.index+1].to_string()
     }
 
+    fn take_identifier(&mut self) -> String {
+        let from = self.index;
+        while let Some(ch) = self.peek() {
+            if ch != '_' && !ch.is_alphabetic() {
+                break;
+            }
+
+            self.index += 1;
+            self.pos += 1;
+        }
+
+        self.input[from..self.index+1].to_string()
+    }
+
     pub fn parse(&mut self) -> Result<(), LexerError> {
         let strlen = self.input.len();
 
@@ -337,6 +351,9 @@ impl Lexer {
                     if ch.is_numeric() {
                         let number = self.take_number();
                         Some(Token::new(TokenType::Number, number.clone(), Some(Value::Float(number.parse().unwrap()))))
+                    } else if ch.is_alphabetic() || ch == '_' {
+                        let ident = self.take_identifier();
+                        Some(Token::new(TokenType::Identifier, ident, Some(Value::Null)))
                     } else {
                         self.report_error(LexerError::UnexpectedToken(self.line, self.pos, ch));
                         None
