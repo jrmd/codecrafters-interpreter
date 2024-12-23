@@ -369,6 +369,7 @@ impl Lexer {
                             "this" => TokenType::This,
                             "var" => TokenType::Var,
                             "while" => TokenType::While,
+                            "fun" => TokenType::Fun,
                             _ => TokenType::Identifier,
                         };
                         Some(Token::new(token_type, ident, Some(Value::Null)))
