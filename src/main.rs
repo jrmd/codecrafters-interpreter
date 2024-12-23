@@ -216,8 +216,14 @@ impl Lexer {
 
         while self.index < strlen {
             self.take_whitespace();
-
             let token = match self.input.chars().nth(self.index) {
+                None => {
+                    if (self.tokens.last().is_some_and(|x| *x == TokenType::Eof)) {
+                        None
+                    } else {
+                        Some(Token::new(TokenType::Eof, String::from(""), Some(Value::Null)))
+                    }
+                }
                 Some('(') => Some(Token::new(TokenType::LeftParen, String::from("("), Some(Value::Null))),
                 Some(')') => Some(Token::new(TokenType::RightParen, String::from(")"), Some(Value::Null))),
                 Some('{') => Some(Token::new(TokenType::LeftBrace, String::from("{"), Some(Value::Null))),
@@ -277,13 +283,11 @@ impl Lexer {
 
                             break;
                         }
-
                         None
                     } else {
                         Some(Token::new(TokenType::Slash, String::from("/"), Some(Value::Null)))
                     }
                 }
-                None => Some(Token::new(TokenType::Eof, String::from(""), Some(Value::Null))),
                 Some(ch) => {
                     self.report_error(LexerError::UnexpectedToken(self.line, self.pos, ch));
                     None
