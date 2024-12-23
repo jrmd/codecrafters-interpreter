@@ -198,6 +198,7 @@ impl Lexer {
                 Some('.') => Some(Token::new(TokenType::Period, String::from("."), Some(Value::Null))),
                 Some(',') => Some(Token::new(TokenType::Comma, String::from(","), Some(Value::Null))),
                 Some('+') => Some(Token::new(TokenType::Plus, String::from("+"), Some(Value::Null))),
+                Some('-') => Some(Token::new(TokenType::Minus, String::from("-"), Some(Value::Null))),
                 None => Some(Token::new(TokenType::Eof, String::from(""), Some(Value::Null))),
                 _ => None,
             };
