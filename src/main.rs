@@ -199,6 +199,8 @@ impl Lexer {
 
     pub fn parse(&mut self) -> Result<(), LexerError> {
         let strlen = self.input.len();
+        let mut err: Option<LexerError> = None;
+
         while self.index < strlen {
             self.take_whitespace();
 
@@ -215,6 +217,7 @@ impl Lexer {
                 Some(';') => Some(Token::new(TokenType::Semicolon, String::from(";"), Some(Value::Null))),
                 None => Some(Token::new(TokenType::Eof, String::from(""), Some(Value::Null))),
                 Some(ch) => {
+                    err = Some(LexerError::ParseError);
                     self.report_error(LexerError::UnexpectedToken(ch));
                     None
                 },
@@ -229,6 +232,10 @@ impl Lexer {
 
         if !self.tokens.last().is_some_and(|x| *x == TokenType::Eof) {
             self.tokens.push(Token::new(TokenType::Eof, String::from(""), Some(Value::Null)));
+        }
+
+        if let Some(e) = err {
+            return Err(e);
         }
 
         Ok(())
@@ -263,9 +270,16 @@ fn main() -> Result<(), Box<dyn Error>> {
 
             let mut lexer = Lexer::new(file_contents);
 
-            lexer.parse()?;
+            let res = lexer.parse();
 
             lexer.dump();
+
+            match res {
+                Err(LexerError::ParseError) => {
+                    std::process::exit(65);
+                },
+                _ => {},
+            };
         }
         _ => {
             writeln!(io::stderr(), "Unknown command: {}", command).unwrap();
