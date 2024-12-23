@@ -24,7 +24,7 @@ impl fmt::Display for Value {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq)]
 enum TokenType {
     LeftParen,
     RightParen,
@@ -145,6 +145,19 @@ impl Token {
         println!("{} {} {}", token_type, self.loxme, value);
     }
 }
+
+impl PartialEq<TokenType> for Token {
+    fn eq(&self, other: &TokenType) -> bool {
+        self.token_type == *other
+    }
+}
+
+impl PartialEq<Token> for TokenType {
+    fn eq(&self, other: &Token) -> bool {
+        *self == other.token_type
+    }
+}
+
 #[derive(Debug)]
 struct Lexer {
     tokens: Vec<Token>,
@@ -192,6 +205,10 @@ impl Lexer {
             }
 
             self.index += 1;
+        }
+
+        if !self.tokens.last().is_some_and(|x| *x == TokenType::Eof) {
+            self.tokens.push(Token::new(TokenType::Eof, String::from(""), Some(Value::Null)));
         }
 
         Ok(())
