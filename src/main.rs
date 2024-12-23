@@ -107,12 +107,15 @@ impl TokenType {
 #[derive(Debug)]
 enum LexerError {
     ParseError,
-    UnexpectedToken,
+    UnexpectedToken(char),
 }
 
 impl fmt::Display for LexerError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "Lexer Error")
+        match self {
+            LexerError::ParseError => write!(f, "Parse Error"),
+            LexerError::UnexpectedToken(ch) => write!(f, "Unexpected character: {}", ch),
+        }
     }
 }
 
@@ -163,6 +166,7 @@ struct Lexer {
     tokens: Vec<Token>,
     input: String,
     index: usize,
+    line: usize,
 }
 
 impl Lexer {
@@ -171,17 +175,26 @@ impl Lexer {
             tokens: Vec::new(),
             input,
             index: 0,
+            line: 0,
         }
     }
 
     fn take_whitespace(&mut self) {
         while let Some(ch) = self.input.chars().nth(self.index) {
+            if ch == '\n' {
+                self.line += 1;
+            }
+
             if ch.is_whitespace() {
                 self.index += 1;
             } else {
                 break;
             }
         }
+    }
+
+    fn report_error(&self, err: LexerError) {
+        writeln!(io::stderr(), "[line {}] {}", self.line, err).unwrap();
     }
 
     pub fn parse(&mut self) -> Result<(), LexerError> {
@@ -201,14 +214,14 @@ impl Lexer {
                 Some('-') => Some(Token::new(TokenType::Minus, String::from("-"), Some(Value::Null))),
                 Some(';') => Some(Token::new(TokenType::Semicolon, String::from(";"), Some(Value::Null))),
                 None => Some(Token::new(TokenType::Eof, String::from(""), Some(Value::Null))),
-                _ => None,
+                Some(ch) => {
+                    self.report_error(LexerError::UnexpectedToken(ch));
+                    None
+                },
             };
 
             if let Some(token) = token {
                 self.tokens.push(token);
-            } else {
-                println!("--{}--", self.input.chars().nth(self.index).unwrap());
-                return Err(LexerError::UnexpectedToken)
             }
 
             self.index += 1;
