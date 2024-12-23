@@ -200,6 +200,7 @@ impl Lexer {
 
     fn report_error(&mut self, err: LexerError) {
         writeln!(io::stderr(), "{}", err).unwrap();
+        self.errors.push(err);
     }
 
     fn has_error(&self) -> bool {
