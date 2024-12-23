@@ -175,7 +175,7 @@ impl Lexer {
             tokens: Vec::new(),
             input,
             index: 0,
-            line: 0,
+            line: 1,
         }
     }
 
