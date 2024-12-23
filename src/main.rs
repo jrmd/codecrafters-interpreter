@@ -193,6 +193,8 @@ impl Lexer {
             let token = match self.input.chars().nth(self.index) {
                 Some('(') => Some(Token::new(TokenType::LeftParen, String::from("("), Some(Value::Null))),
                 Some(')') => Some(Token::new(TokenType::RightParen, String::from(")"), Some(Value::Null))),
+                Some('{') => Some(Token::new(TokenType::LeftBrace, String::from("{"), Some(Value::Null))),
+                Some('}') => Some(Token::new(TokenType::RightBrace, String::from("}"), Some(Value::Null))),
                 None => Some(Token::new(TokenType::Eof, String::from(""), Some(Value::Null))),
                 _ => None,
             };
