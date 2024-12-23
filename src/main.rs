@@ -79,7 +79,7 @@ impl TokenType {
             TokenType::Less => "LESS",
             TokenType::LessEqual => "LESS_EQUAL",
             TokenType::Identifier => "IDENTIFIER",
-            TokenType::Str => "STR",
+            TokenType::Str => "STRING",
             TokenType::Number => "NUMBER",
             TokenType::And => "AND",
             TokenType::Class => "CLASS",
