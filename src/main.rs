@@ -808,7 +808,7 @@ fn main() -> Result<(), Box<dyn Error>> {
                 parser.dump();
             } else {
                 let res = res.err().unwrap();
-                println!("{res}\n");
+                println!("\n{res}\n");
                 std::process::exit(65);
             }
         }
