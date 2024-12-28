@@ -540,7 +540,7 @@ impl Expr {
                     TokenType::Bang => match expr {
                         Value::Bool(val) => Value::Bool(!val),
                         Value::Nil => Value::Bool(true),
-                        _ => Value::Bool(true),
+                        _ => Value::Bool(false),
                     },
 
                     TokenType::Minus => match expr {
