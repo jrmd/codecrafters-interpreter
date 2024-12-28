@@ -642,7 +642,6 @@ impl Parser {
                 } else {
                     let lhs = self.exprs.pop().expect("lhs expr");
                     let rhs = self.parse_one(depth + 1)?.expect("rhs expr");
-                    println!("lhs: {}, op: {:?}, rhs: {}", lhs, token.token_type, rhs);
                     Some(Expr::Binary(Box::new(lhs), token, Box::new(rhs)))
                 }
             }
