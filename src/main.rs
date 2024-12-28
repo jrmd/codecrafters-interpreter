@@ -527,6 +527,13 @@ impl Expr {
     pub fn evaluate(&self) -> Value {
         match self {
             Expr::Literal(value) => value.clone(),
+            Expr::Group(exprs) => {
+                if exprs.len() > 1 {
+                    todo!();
+                }
+
+                exprs.get(0).unwrap().evaluate()
+            }
             _ => todo!(),
         }
     }
