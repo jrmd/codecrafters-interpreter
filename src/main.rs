@@ -645,13 +645,33 @@ impl Parser {
                     Some(Expr::Binary(Box::new(lhs), token, Box::new(rhs)))
                 }
             }
-            TokenType::Star | TokenType::Slash | TokenType::Plus => {
+            TokenType::Plus
+            | TokenType::Less
+            | TokenType::LessEqual
+            | TokenType::Greater
+            | TokenType::GreaterEqual
+            | TokenType::EqualEqual
+            | TokenType::BangEqual => {
+                let lhs = self.exprs.pop().expect("lhs expr");
+                let rhs = self.parse_one(depth + 1)?.expect("rhs expr");
+                Some(Expr::Binary(Box::new(lhs), token, Box::new(rhs)))
+            }
+            TokenType::Star | TokenType::Slash => {
                 let lhs = self.exprs.pop().expect("lhs expr");
                 let rhs = Box::new(self.parse_one(depth + 1)?.expect("rhs expr"));
 
                 let op = match lhs.clone() {
                     Expr::Binary(_l, op, _r) => {
-                        if op == TokenType::Plus || op == TokenType::Minus {
+                        if matches!(
+                            op.token_type,
+                            TokenType::Plus
+                                | TokenType::Less
+                                | TokenType::LessEqual
+                                | TokenType::Greater
+                                | TokenType::GreaterEqual
+                                | TokenType::EqualEqual
+                                | TokenType::BangEqual
+                        ) {
                             Some(Expr::Binary(
                                 _l,
                                 op,
