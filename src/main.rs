@@ -517,6 +517,10 @@ impl Lexer {
         self.tokenIndex += 1;
         return token;
     }
+
+    pub fn peek_token(&self) -> Option<&Token> {
+        self.tokens.get(self.tokenIndex + 1)
+    }
 }
 
 //// PARSER
@@ -538,29 +542,100 @@ impl fmt::Display for Expr {
             Expr::Binary(left, op, right) => {
                 f.write_fmt(format_args!("{} {left} {right}", op.loxme))
             }
-            Expr::Group(_) => todo!(),
+            Expr::Group(tokens) => f.write_fmt(format_args!(
+                "(group {})",
+                tokens
+                    .iter()
+                    .map(|x| format!("{x}"))
+                    .collect::<Vec<String>>()
+                    .join(" ")
+            )),
         }
     }
+}
+
+enum ParserError {
+    MissingToken(TokenType),
 }
 
 // impl Debug for Expr {}
 
 #[derive(Debug)]
 struct Parser {
-    lexer: Lexer,
+    tokens: Vec<Token>,
+    tokens_index: usize,
     exprs: Vec<Expr>,
 }
 
 impl Parser {
-    pub fn new(lexer: Lexer) -> Self {
+    pub fn new(tokens: Vec<Token>) -> Self {
         Self {
-            lexer,
+            tokens,
+            tokens_index: 0,
             exprs: Vec::new(),
         }
     }
 
-    pub fn parse(&mut self) {
-        while let Some(token) = self.lexer.next() {
+    fn next(&mut self) -> Option<Token> {
+        let token = self.tokens.get(self.tokens_index);
+        self.tokens_index += 1;
+
+        if token.is_some() {
+            return Some(token.unwrap().clone());
+        }
+
+        return None;
+    }
+
+    pub fn take_until(&mut self, end: TokenType) -> Result<Vec<Token>, ParserError> {
+        let mut output = Vec::<Token>::new();
+        let mut found = false;
+
+        while let Some(token) = self.next() {
+            if token.token_type == end {
+                found = true;
+                break;
+            }
+
+            output.push(token);
+        }
+
+        if !found {
+            Err(ParserError::MissingToken(end))
+        } else {
+            Ok(output)
+        }
+    }
+
+    pub fn parse_within(&mut self, tokens: &mut Vec<Token>) -> Result<Vec<Expr>, ParserError> {
+        let mut token_index = 0;
+        let mut exprs = Vec::<Expr>::new();
+
+        while let Some(token) = tokens.get(token_index) {
+            let token = (*token).clone();
+            let expr = match token.token_type {
+                TokenType::Number => Expr::Literal(token.value.unwrap().to_owned()),
+                TokenType::True => Expr::Literal(Value::Bool(true)),
+                TokenType::False => Expr::Literal(Value::Bool(false)),
+                TokenType::Nil => Expr::Literal(Value::Nil),
+                TokenType::Str => Expr::Literal(token.value.unwrap().to_owned()),
+                TokenType::LeftParen => {
+                    let mut tokens = self.take_until(TokenType::RightParen)?;
+                    Expr::Group(self.parse_within(&mut tokens)?)
+                }
+                TokenType::Eof => return Ok(exprs),
+                _ => todo!(),
+            };
+
+            exprs.push(expr);
+            token_index += 1;
+        }
+
+        Ok(exprs)
+    }
+
+    pub fn parse(&mut self) -> Result<(), ParserError> {
+        while let Some(token) = self.next() {
             let token = token.clone();
             let expr = match token.token_type {
                 TokenType::Number => Expr::Literal(token.value.unwrap().to_owned()),
@@ -568,12 +643,18 @@ impl Parser {
                 TokenType::False => Expr::Literal(Value::Bool(false)),
                 TokenType::Nil => Expr::Literal(Value::Nil),
                 TokenType::Str => Expr::Literal(token.value.unwrap().to_owned()),
-                TokenType::Eof => return,
+                TokenType::LeftParen => {
+                    let mut tokens = self.take_until(TokenType::RightParen)?;
+                    Expr::Group(self.parse_within(&mut tokens)?)
+                }
+                TokenType::Eof => return Ok(()),
                 _ => todo!(),
             };
 
             self.exprs.push(expr);
         }
+
+        Ok(())
     }
 
     pub fn dump(&self) {
@@ -623,10 +704,11 @@ fn main() -> Result<(), Box<dyn Error>> {
             if lexer.has_error() {
                 std::process::exit(65);
             }
-            let mut parser = Parser::new(lexer);
+            let mut parser = Parser::new(lexer.tokens);
 
-            parser.parse();
-            parser.dump();
+            if parser.parse().is_ok() {
+                parser.dump();
+            }
         }
         _ => {
             writeln!(io::stderr(), "Unknown command: {}", command).unwrap();
