@@ -1,8 +1,9 @@
 use core::fmt;
 use std::env;
+use std::error::Error;
+use std::fmt::Debug;
 use std::fs;
 use std::io::{self, Write};
-use std::error::Error;
 
 #[derive(Debug, Clone)]
 enum Value {
@@ -51,14 +52,28 @@ enum TokenType {
     Str,
     Number,
 
-    And, Class, Else, False, Fun, For, If, Nil, Or,
-    Print, Return, Super, This, True, Var, While,
+    And,
+    Class,
+    Else,
+    False,
+    Fun,
+    For,
+    If,
+    Nil,
+    Or,
+    Print,
+    Return,
+    Super,
+    This,
+    True,
+    Var,
+    While,
 
     Eof,
 }
 impl TokenType {
     pub fn to_string(self) -> String {
-       let val = match self {
+        let val = match self {
             TokenType::LeftParen => "LEFT_PAREN",
             TokenType::RightParen => "RIGHT_PAREN",
             TokenType::LeftBrace => "LEFT_BRACE",
@@ -115,13 +130,17 @@ impl fmt::Display for LexerError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             LexerError::ParseError(line, _) => write!(f, "[line {}] Error: Parse Error", line),
-            LexerError::UnexpectedToken(line, _, ch) => write!(f, "[line {}] Error: Unexpected character: {}", line, ch),
-            LexerError::UnterminatedString(line, _) => write!(f, "[line {}] Error: Unterminated string.", line),
+            LexerError::UnexpectedToken(line, _, ch) => {
+                write!(f, "[line {}] Error: Unexpected character: {}", line, ch)
+            }
+            LexerError::UnterminatedString(line, _) => {
+                write!(f, "[line {}] Error: Unterminated string.", line)
+            }
         }
     }
 }
 
-impl std::error::Error for LexerError  {
+impl std::error::Error for LexerError {
     fn description(&self) -> &str {
         "lexer error"
     }
@@ -170,7 +189,8 @@ struct Lexer {
     index: usize,
     line: usize,
     pos: usize,
-    errors: Vec<LexerError>
+    errors: Vec<LexerError>,
+    tokenIndex: usize,
 }
 
 impl Lexer {
@@ -182,6 +202,7 @@ impl Lexer {
             line: 1,
             pos: 0,
             errors: Vec::<LexerError>::new(),
+            tokenIndex: 0,
         }
     }
 
@@ -235,7 +256,7 @@ impl Lexer {
                 continue;
             }
 
-            return Some(self.input[from..self.index+1].to_string())
+            return Some(self.input[from..self.index + 1].to_string());
         }
 
         None
@@ -252,7 +273,7 @@ impl Lexer {
             self.pos += 1;
         }
 
-        self.input[from..self.index+1].to_string()
+        self.input[from..self.index + 1].to_string()
     }
 
     fn take_identifier(&mut self) -> String {
@@ -266,10 +287,10 @@ impl Lexer {
             self.pos += 1;
         }
 
-        self.input[from..self.index+1].to_string()
+        self.input[from..self.index + 1].to_string()
     }
 
-    pub fn parse(&mut self) -> Result<(), LexerError> {
+    pub fn tokenize(&mut self) -> Result<(), LexerError> {
         let strlen = self.input.len();
 
         while self.index < strlen {
@@ -279,55 +300,131 @@ impl Lexer {
                     if (self.tokens.last().is_some_and(|x| *x == TokenType::Eof)) {
                         None
                     } else {
-                        Some(Token::new(TokenType::Eof, String::from(""), Some(Value::Null)))
+                        Some(Token::new(
+                            TokenType::Eof,
+                            String::from(""),
+                            Some(Value::Null),
+                        ))
                     }
                 }
-                Some('(') => Some(Token::new(TokenType::LeftParen, String::from("("), Some(Value::Null))),
-                Some(')') => Some(Token::new(TokenType::RightParen, String::from(")"), Some(Value::Null))),
-                Some('{') => Some(Token::new(TokenType::LeftBrace, String::from("{"), Some(Value::Null))),
-                Some('}') => Some(Token::new(TokenType::RightBrace, String::from("}"), Some(Value::Null))),
-                Some('*') => Some(Token::new(TokenType::Star, String::from("*"), Some(Value::Null))),
-                Some('.') => Some(Token::new(TokenType::Period, String::from("."), Some(Value::Null))),
-                Some(',') => Some(Token::new(TokenType::Comma, String::from(","), Some(Value::Null))),
-                Some('+') => Some(Token::new(TokenType::Plus, String::from("+"), Some(Value::Null))),
-                Some('-') => Some(Token::new(TokenType::Minus, String::from("-"), Some(Value::Null))),
-                Some(';') => Some(Token::new(TokenType::Semicolon, String::from(";"), Some(Value::Null))),
+                Some('(') => Some(Token::new(
+                    TokenType::LeftParen,
+                    String::from("("),
+                    Some(Value::Null),
+                )),
+                Some(')') => Some(Token::new(
+                    TokenType::RightParen,
+                    String::from(")"),
+                    Some(Value::Null),
+                )),
+                Some('{') => Some(Token::new(
+                    TokenType::LeftBrace,
+                    String::from("{"),
+                    Some(Value::Null),
+                )),
+                Some('}') => Some(Token::new(
+                    TokenType::RightBrace,
+                    String::from("}"),
+                    Some(Value::Null),
+                )),
+                Some('*') => Some(Token::new(
+                    TokenType::Star,
+                    String::from("*"),
+                    Some(Value::Null),
+                )),
+                Some('.') => Some(Token::new(
+                    TokenType::Period,
+                    String::from("."),
+                    Some(Value::Null),
+                )),
+                Some(',') => Some(Token::new(
+                    TokenType::Comma,
+                    String::from(","),
+                    Some(Value::Null),
+                )),
+                Some('+') => Some(Token::new(
+                    TokenType::Plus,
+                    String::from("+"),
+                    Some(Value::Null),
+                )),
+                Some('-') => Some(Token::new(
+                    TokenType::Minus,
+                    String::from("-"),
+                    Some(Value::Null),
+                )),
+                Some(';') => Some(Token::new(
+                    TokenType::Semicolon,
+                    String::from(";"),
+                    Some(Value::Null),
+                )),
                 Some('=') => {
                     if Some('=') == self.peek() {
                         self.index += 1;
                         self.pos += 1;
-                        Some(Token::new(TokenType::EqualEqual, String::from("=="), Some(Value::Null)))
+                        Some(Token::new(
+                            TokenType::EqualEqual,
+                            String::from("=="),
+                            Some(Value::Null),
+                        ))
                     } else {
-                        Some(Token::new(TokenType::Equal, String::from("="), Some(Value::Null)))
+                        Some(Token::new(
+                            TokenType::Equal,
+                            String::from("="),
+                            Some(Value::Null),
+                        ))
                     }
-                },
+                }
                 Some('!') => {
                     if Some('=') == self.peek() {
                         self.index += 1;
                         self.pos += 1;
-                        Some(Token::new(TokenType::BangEqual, String::from("!="), Some(Value::Null)))
+                        Some(Token::new(
+                            TokenType::BangEqual,
+                            String::from("!="),
+                            Some(Value::Null),
+                        ))
                     } else {
-                        Some(Token::new(TokenType::Bang, String::from("!"), Some(Value::Null)))
+                        Some(Token::new(
+                            TokenType::Bang,
+                            String::from("!"),
+                            Some(Value::Null),
+                        ))
                     }
                 }
                 Some('>') => {
                     if Some('=') == self.peek() {
                         self.index += 1;
                         self.pos += 1;
-                        Some(Token::new(TokenType::GreaterEqual, String::from(">="), Some(Value::Null)))
+                        Some(Token::new(
+                            TokenType::GreaterEqual,
+                            String::from(">="),
+                            Some(Value::Null),
+                        ))
                     } else {
-                        Some(Token::new(TokenType::Greater, String::from(">"), Some(Value::Null)))
+                        Some(Token::new(
+                            TokenType::Greater,
+                            String::from(">"),
+                            Some(Value::Null),
+                        ))
                     }
-                },
+                }
                 Some('<') => {
                     if Some('=') == self.peek() {
                         self.index += 1;
                         self.pos += 1;
-                        Some(Token::new(TokenType::LessEqual, String::from("<="), Some(Value::Null)))
+                        Some(Token::new(
+                            TokenType::LessEqual,
+                            String::from("<="),
+                            Some(Value::Null),
+                        ))
                     } else {
-                        Some(Token::new(TokenType::Less, String::from("<"), Some(Value::Null)))
+                        Some(Token::new(
+                            TokenType::Less,
+                            String::from("<"),
+                            Some(Value::Null),
+                        ))
                     }
-                },
+                }
                 Some('/') => {
                     if Some('/') == self.peek() {
                         self.index += 1;
@@ -335,7 +432,11 @@ impl Lexer {
                         self.take_until('\n');
                         None
                     } else {
-                        Some(Token::new(TokenType::Slash, String::from("/"), Some(Value::Null)))
+                        Some(Token::new(
+                            TokenType::Slash,
+                            String::from("/"),
+                            Some(Value::Null),
+                        ))
                     }
                 }
                 Some('"') => {
@@ -350,7 +451,11 @@ impl Lexer {
                 Some(ch) => {
                     if ch.is_numeric() {
                         let number = self.take_number();
-                        Some(Token::new(TokenType::Number, number.clone(), Some(Value::Float(number.parse().unwrap()))))
+                        Some(Token::new(
+                            TokenType::Number,
+                            number.clone(),
+                            Some(Value::Float(number.parse().unwrap())),
+                        ))
                     } else if ch.is_alphabetic() || ch == '_' {
                         let ident = self.take_identifier();
                         let token_type = match ident.as_str() {
@@ -377,7 +482,7 @@ impl Lexer {
                         self.report_error(LexerError::UnexpectedToken(self.line, self.pos, ch));
                         None
                     }
-                },
+                }
             };
 
             if let Some(token) = token {
@@ -389,15 +494,88 @@ impl Lexer {
         }
 
         if !self.tokens.last().is_some_and(|x| *x == TokenType::Eof) {
-            self.tokens.push(Token::new(TokenType::Eof, String::from(""), Some(Value::Null)));
+            self.tokens.push(Token::new(
+                TokenType::Eof,
+                String::from(""),
+                Some(Value::Null),
+            ));
         }
 
         Ok(())
     }
- 
+
     pub fn dump(&self) {
         for token in self.tokens.clone().into_iter() {
             token.log();
+        }
+    }
+
+    pub fn next(&mut self) -> Option<&Token> {
+        let token = self.tokens.get(self.tokenIndex);
+        self.tokenIndex += 1;
+        return token;
+    }
+}
+
+//// PARSER
+///
+
+#[derive(Debug)]
+enum Expr {
+    Binary(Box<Expr>, Token, Box<Expr>),
+    Literal(Value),
+    Unary(Token, Box<Expr>),
+    Group(Vec<Expr>),
+}
+
+impl fmt::Display for Expr {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Expr::Unary(op, expr) => f.write_fmt(format_args!("{} {expr}", op.loxme)),
+            Expr::Literal(value) => f.write_fmt(format_args!("{}", value)),
+            Expr::Binary(left, op, right) => {
+                f.write_fmt(format_args!("{} {left} {right}", op.loxme))
+            }
+            Expr::Group(_) => todo!(),
+        }
+    }
+}
+
+// impl Debug for Expr {}
+
+#[derive(Debug)]
+struct Parser {
+    lexer: Lexer,
+    exprs: Vec<Expr>,
+}
+
+impl Parser {
+    pub fn new(lexer: Lexer) -> Self {
+        Self {
+            lexer,
+            exprs: Vec::new(),
+        }
+    }
+
+    pub fn parse(&mut self) {
+        while let Some(token) = self.lexer.next() {
+            let token = token.clone();
+            let expr = match token.token_type {
+                TokenType::Number => Expr::Literal(token.value.unwrap().to_owned()),
+                TokenType::True => Expr::Literal(Value::Bool(true)),
+                TokenType::False => Expr::Literal(Value::Bool(false)),
+                TokenType::Nil => Expr::Literal(token.value.unwrap().to_owned()),
+                TokenType::Eof => return,
+                _ => todo!(),
+            };
+
+            self.exprs.push(expr);
+        }
+    }
+
+    pub fn dump(&self) {
+        for expr in self.exprs.iter() {
+            println!("{}", expr)
         }
     }
 }
@@ -424,12 +602,28 @@ fn main() -> Result<(), Box<dyn Error>> {
 
             let mut lexer = Lexer::new(file_contents);
 
-            let _ = lexer.parse();
+            let _ = lexer.tokenize();
             lexer.dump();
 
             if lexer.has_error() {
                 std::process::exit(65);
             }
+        }
+        "parse" => {
+            let file_contents = fs::read_to_string(filename).unwrap_or_else(|_| {
+                writeln!(io::stderr(), "Failed to read file {}", filename).unwrap();
+                String::new()
+            });
+
+            let mut lexer = Lexer::new(file_contents);
+            let _ = lexer.tokenize();
+            if lexer.has_error() {
+                std::process::exit(65);
+            }
+            let mut parser = Parser::new(lexer);
+
+            parser.parse();
+            parser.dump();
         }
         _ => {
             writeln!(io::stderr(), "Unknown command: {}", command).unwrap();
