@@ -534,7 +534,26 @@ impl Expr {
 
                 exprs.get(0).unwrap().evaluate()
             }
-            _ => todo!(),
+            Expr::Unary(token, expr) => {
+                let expr = expr.to_owned().evaluate();
+                match token.token_type {
+                    TokenType::Bang => match expr {
+                        Value::Bool(val) => Value::Bool(!val),
+                        _ => todo!("bang"),
+                    },
+
+                    TokenType::Minus => match expr {
+                        Value::Int(val) => Value::Int(-val),
+                        Value::Float(val) => Value::Float(-val),
+                        _ => todo!("minus"),
+                    },
+                    _ => todo!("token type"),
+                }
+            }
+            _ => {
+                println!("{:?}", self);
+                todo!("expr");
+            }
         }
     }
 }
