@@ -192,7 +192,6 @@ struct Lexer {
     line: usize,
     pos: usize,
     errors: Vec<LexerError>,
-    tokenIndex: usize,
 }
 
 impl Lexer {
@@ -204,7 +203,6 @@ impl Lexer {
             line: 1,
             pos: 0,
             errors: Vec::<LexerError>::new(),
-            tokenIndex: 0,
         }
     }
 
@@ -511,22 +509,12 @@ impl Lexer {
             token.log();
         }
     }
-
-    pub fn next(&mut self) -> Option<&Token> {
-        let token = self.tokens.get(self.tokenIndex);
-        self.tokenIndex += 1;
-        return token;
-    }
-
-    pub fn peek_token(&self) -> Option<&Token> {
-        self.tokens.get(self.tokenIndex + 1)
-    }
 }
 
 //// PARSER
 ///
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 enum Expr {
     Binary(Box<Expr>, Token, Box<Expr>),
     Literal(Value),
@@ -587,14 +575,28 @@ impl Parser {
         return None;
     }
 
-    pub fn take_until(&mut self, end: TokenType) -> Result<Vec<Token>, ParserError> {
+    pub fn take_until(
+        &mut self,
+        start: TokenType,
+        end: TokenType,
+    ) -> Result<Vec<Token>, ParserError> {
         let mut output = Vec::<Token>::new();
         let mut found = false;
 
+        let mut skip = 0;
+
         while let Some(token) = self.next() {
+            if token.token_type == start {
+                skip += 1;
+            }
+
             if token.token_type == end {
-                found = true;
-                break;
+                if skip == 0 {
+                    found = true;
+                    break;
+                } else {
+                    skip -= 1;
+                }
             }
 
             output.push(token);
@@ -607,34 +609,7 @@ impl Parser {
         }
     }
 
-    pub fn parse_within(&mut self, tokens: &mut Vec<Token>) -> Result<Vec<Expr>, ParserError> {
-        let mut token_index = 0;
-        let mut exprs = Vec::<Expr>::new();
-
-        while let Some(token) = tokens.get(token_index) {
-            let token = (*token).clone();
-            let expr = match token.token_type {
-                TokenType::Number => Expr::Literal(token.value.unwrap().to_owned()),
-                TokenType::True => Expr::Literal(Value::Bool(true)),
-                TokenType::False => Expr::Literal(Value::Bool(false)),
-                TokenType::Nil => Expr::Literal(Value::Nil),
-                TokenType::Str => Expr::Literal(token.value.unwrap().to_owned()),
-                TokenType::LeftParen => {
-                    let mut tokens = self.take_until(TokenType::RightParen)?;
-                    Expr::Group(self.parse_within(&mut tokens)?)
-                }
-                TokenType::Eof => return Ok(exprs),
-                _ => todo!(),
-            };
-
-            exprs.push(expr);
-            token_index += 1;
-        }
-
-        Ok(exprs)
-    }
-
-    pub fn parse(&mut self) -> Result<(), ParserError> {
+    pub fn parse(&mut self) -> Result<Vec<Expr>, ParserError> {
         while let Some(token) = self.next() {
             let token = token.clone();
             let expr = match token.token_type {
@@ -644,17 +619,20 @@ impl Parser {
                 TokenType::Nil => Expr::Literal(Value::Nil),
                 TokenType::Str => Expr::Literal(token.value.unwrap().to_owned()),
                 TokenType::LeftParen => {
-                    let mut tokens = self.take_until(TokenType::RightParen)?;
-                    Expr::Group(self.parse_within(&mut tokens)?)
+                    let mut tokens =
+                        self.take_until(TokenType::LeftParen, TokenType::RightParen)?;
+                    let expr = Expr::Group(Parser::new(tokens).parse()?);
+
+                    expr
                 }
-                TokenType::Eof => return Ok(()),
+                TokenType::Eof => return Ok(self.exprs.clone()),
                 _ => todo!(),
             };
 
             self.exprs.push(expr);
         }
 
-        Ok(())
+        Ok(self.exprs.clone())
     }
 
     pub fn dump(&self) {
@@ -708,6 +686,8 @@ fn main() -> Result<(), Box<dyn Error>> {
 
             if parser.parse().is_ok() {
                 parser.dump();
+            } else {
+                println!("Error!");
             }
         }
         _ => {
