@@ -567,6 +567,7 @@ impl Parser {
                 TokenType::True => Expr::Literal(Value::Bool(true)),
                 TokenType::False => Expr::Literal(Value::Bool(false)),
                 TokenType::Nil => Expr::Literal(Value::Nil),
+                TokenType::Str => Expr::Literal(token.value.unwrap().to_owned()),
                 TokenType::Eof => return,
                 _ => todo!(),
             };
