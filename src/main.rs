@@ -609,7 +609,7 @@ impl Parser {
         }
     }
 
-    pub fn parse_one(&mut self) -> Result<Option<Expr>, ParserError> {
+    pub fn parse_one(&mut self, depth: usize) -> Result<Option<Expr>, ParserError> {
         let token = self.next().clone();
         if token.is_none() {
             return Ok(None);
@@ -629,14 +629,28 @@ impl Parser {
 
                 Some(expr)
             }
-            TokenType::Bang | TokenType::Minus => {
-                let expr = self.parse_one()?.expect("expr wanted");
+            TokenType::Bang => {
+                let expr = self.parse_one(depth + 1)?.expect("expr wanted");
                 Some(Expr::Unary(token, Box::new(expr)))
+            }
+            TokenType::Minus => {
+                if depth > 0 || self.exprs.is_empty() {
+                    Some(Expr::Unary(
+                        token,
+                        Box::new(self.parse_one(depth + 1)?.expect("Minus!!")),
+                    ))
+                } else {
+                    Some(Expr::Binary(
+                        Box::new(self.exprs.pop().expect("lhs expr")),
+                        token,
+                        Box::new(self.parse_one(depth + 1)?.expect("rhs expr")),
+                    ))
+                }
             }
             TokenType::Star | TokenType::Slash | TokenType::Plus => Some(Expr::Binary(
                 Box::new(self.exprs.pop().expect("lhs expr")),
                 token,
-                Box::new(self.parse_one()?.expect("rhs expr")),
+                Box::new(self.parse_one(depth + 1)?.expect("rhs expr")),
             )),
             TokenType::Eof => return Ok(None),
             _ => todo!(),
@@ -646,7 +660,7 @@ impl Parser {
     }
 
     pub fn parse(&mut self) -> Result<Vec<Expr>, ParserError> {
-        while let Some(expr) = self.parse_one()? {
+        while let Some(expr) = self.parse_one(0)? {
             self.exprs.push(expr);
         }
 
