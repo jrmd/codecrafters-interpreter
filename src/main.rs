@@ -533,12 +533,12 @@ impl fmt::Display for ParserError {
         match self {
             ParserError::ExpectedExpression(str, line) => {
                 write!(f, "[line {}] Error at '{}': Expect expression.", line, str)
-            }
-            ParserError::MissingToken(token_type, line) => write!(
-                f,
-                "[line {}] Error at '{:?}': Expect expression.",
-                line, token_type
-            ),
+            } // ParserError::MissingToken(token_type, line) => write!(
+            //     f,
+            //     "[line {}] Error at '{:?}': Expect expression.",
+            //     line, token_type
+            // ),
+            _ => write!(f, ""),
         }
     }
 }
