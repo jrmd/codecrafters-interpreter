@@ -503,6 +503,15 @@ enum Expr {
     Group(Vec<Expr>),
 }
 
+impl Expr {
+    pub fn evaluate(&self) -> Value {
+        match self {
+            Expr::Literal(value) => value.clone(),
+            _ => todo!(),
+        }
+    }
+}
+
 impl fmt::Display for Expr {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
@@ -761,6 +770,21 @@ impl Parser {
     }
 }
 
+#[derive(Debug)]
+enum EvaluationError {}
+impl fmt::Display for EvaluationError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "")
+    }
+}
+
+fn evaluate(exprs: Vec<Expr>) -> Result<(), EvaluationError> {
+    for expr in exprs {
+        println!("{}", expr.evaluate());
+    }
+    Ok(())
+}
+
 fn main() -> Result<(), Box<dyn Error>> {
     let args: Vec<String> = env::args().collect();
     if args.len() < 3 {
@@ -811,6 +835,28 @@ fn main() -> Result<(), Box<dyn Error>> {
                 writeln!(io::stderr(), "{res}").unwrap();
                 std::process::exit(65);
             }
+        }
+        "evaluate" => {
+            let file_contents = fs::read_to_string(filename).unwrap_or_else(|_| {
+                writeln!(io::stderr(), "Failed to read file {}", filename).unwrap();
+                String::new()
+            });
+
+            let mut lexer = Lexer::new(file_contents);
+            let _ = lexer.tokenize();
+            if lexer.has_error() {
+                std::process::exit(65);
+            }
+            let mut parser = Parser::new(lexer.tokens);
+            let res = parser.parse();
+
+            if res.is_err() {
+                let res = res.err().unwrap();
+                writeln!(io::stderr(), "{res}").unwrap();
+                std::process::exit(65);
+            }
+
+            evaluate(parser.exprs).unwrap();
         }
         _ => {
             writeln!(io::stderr(), "Unknown command: {}", command).unwrap();
