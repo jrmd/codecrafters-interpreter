@@ -528,7 +528,7 @@ impl fmt::Display for Expr {
             Expr::Unary(op, expr) => f.write_fmt(format_args!("({} {expr})", op.loxme)),
             Expr::Literal(value) => f.write_fmt(format_args!("{}", value)),
             Expr::Binary(left, op, right) => {
-                f.write_fmt(format_args!("{} {left} {right}", op.loxme))
+                f.write_fmt(format_args!("({} {left} {right})", op.loxme))
             }
             Expr::Group(tokens) => f.write_fmt(format_args!(
                 "(group {})",
@@ -609,39 +609,45 @@ impl Parser {
         }
     }
 
+    pub fn parse_one(&mut self) -> Result<Option<Expr>, ParserError> {
+        let token = self.next().clone();
+        if token.is_none() {
+            return Ok(None);
+        }
+
+        let token = token.unwrap();
+
+        let expr = match token.token_type {
+            TokenType::Number => Some(Expr::Literal(token.value.unwrap().to_owned())),
+            TokenType::True => Some(Expr::Literal(Value::Bool(true))),
+            TokenType::False => Some(Expr::Literal(Value::Bool(false))),
+            TokenType::Nil => Some(Expr::Literal(Value::Nil)),
+            TokenType::Str => Some(Expr::Literal(token.value.unwrap().to_owned())),
+            TokenType::LeftParen => {
+                let tokens = self.take_until(TokenType::LeftParen, TokenType::RightParen)?;
+                let expr = Expr::Group(Parser::new(tokens).parse()?);
+
+                Some(expr)
+            }
+            TokenType::Bang | TokenType::Minus => {
+                let expr = self.parse_one()?.expect("expr wanted");
+                Some(Expr::Unary(token, Box::new(expr)))
+            }
+            TokenType::Star | TokenType::Slash | TokenType::Plus => Some(Expr::Binary(
+                Box::new(self.exprs.pop().expect("lhs expr")),
+                token,
+                Box::new(self.parse_one()?.expect("rhs expr")),
+            )),
+            TokenType::Eof => return Ok(None),
+            _ => todo!(),
+        };
+
+        Ok(expr)
+    }
+
     pub fn parse(&mut self) -> Result<Vec<Expr>, ParserError> {
-        let mut stack: Vec<Token> = Vec::new();
-        while let Some(token) = self.next() {
-            let token = token.clone();
-            let mut expr = match token.token_type {
-                TokenType::Number => Some(Expr::Literal(token.value.unwrap().to_owned())),
-                TokenType::True => Some(Expr::Literal(Value::Bool(true))),
-                TokenType::False => Some(Expr::Literal(Value::Bool(false))),
-                TokenType::Nil => Some(Expr::Literal(Value::Nil)),
-                TokenType::Str => Some(Expr::Literal(token.value.unwrap().to_owned())),
-                TokenType::LeftParen => {
-                    let tokens = self.take_until(TokenType::LeftParen, TokenType::RightParen)?;
-                    let expr = Expr::Group(Parser::new(tokens).parse()?);
-
-                    Some(expr)
-                }
-                TokenType::Bang | TokenType::Minus => {
-                    stack.push(token);
-                    None
-                }
-                TokenType::Eof => return Ok(self.exprs.clone()),
-                _ => todo!(),
-            };
-
-            if expr.is_none() {
-                continue;
-            }
-
-            while !stack.is_empty() {
-                expr = Some(Expr::Unary(stack.pop().unwrap(), Box::new(expr.unwrap())));
-            }
-
-            self.exprs.push(expr.unwrap());
+        while let Some(expr) = self.parse_one()? {
+            self.exprs.push(expr);
         }
 
         Ok(self.exprs.clone())
