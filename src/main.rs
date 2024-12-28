@@ -5,7 +5,7 @@ use std::fmt::Debug;
 use std::fs;
 use std::io::{self, Write};
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 enum Value {
     Str(String),
     Int(i64),
@@ -23,6 +23,27 @@ impl Value {
             Value::Bool(val) => format!("{}", if *val { "true" } else { "false" }),
             Value::Null => format!("{}", String::from("null")),
             Value::Nil => format!("{}", String::from("nil")),
+        }
+    }
+
+    fn is_int(&self) -> bool {
+        match self {
+            Value::Int(_) => true,
+            _ => false,
+        }
+    }
+
+    fn is_float(&self) -> bool {
+        match self {
+            Value::Float(_) => true,
+            _ => false,
+        }
+    }
+
+    fn is_numeric(&self) -> bool {
+        match self {
+            Value::Float(_) | Value::Int(_) => true,
+            _ => false,
         }
     }
 }
@@ -549,6 +570,86 @@ impl Expr {
                         _ => todo!("minus"),
                     },
                     _ => todo!("token type"),
+                }
+            }
+            Expr::Binary(lhs, op, rhs) => {
+                match op.token_type {
+                    TokenType::Minus | TokenType::Slash | TokenType::Star | TokenType::Plus => {
+                        let lhs = lhs.evaluate();
+                        let rhs = rhs.evaluate();
+
+                        if !lhs.is_numeric() || !rhs.is_numeric() {
+                            todo!();
+                        }
+
+                        if lhs.is_int() != rhs.is_int() {
+                            let lhs = match lhs {
+                                Value::Int(v) => v as f64,
+                                Value::Float(v) => v,
+                                _ => todo!(),
+                            };
+
+                            let rhs = match rhs {
+                                Value::Int(v) => v as f64,
+                                Value::Float(v) => v,
+                                _ => todo!(),
+                            };
+                            // do as float
+
+                            let val = match op.token_type {
+                                TokenType::Plus => lhs + rhs,
+                                TokenType::Minus => lhs - rhs,
+                                TokenType::Star => lhs * rhs,
+                                TokenType::Slash => lhs / rhs,
+                                _ => 0.0,
+                            };
+
+                            return Value::Float(val);
+                        }
+
+                        // match type
+                        if lhs.is_int() {
+                            let lhs = match lhs {
+                                Value::Int(v) => v,
+                                _ => todo!(),
+                            };
+
+                            let rhs = match rhs {
+                                Value::Int(v) => v,
+                                _ => todo!(),
+                            };
+
+                            let val = match op.token_type {
+                                TokenType::Plus => lhs + rhs,
+                                TokenType::Minus => lhs - rhs,
+                                TokenType::Star => lhs * rhs,
+                                TokenType::Slash => lhs / rhs,
+                                _ => 0,
+                            };
+                            return Value::Int(val);
+                        }
+
+                        let lhs = match lhs {
+                            Value::Float(v) => v,
+                            _ => todo!(),
+                        };
+
+                        let rhs = match rhs {
+                            Value::Float(v) => v,
+                            _ => todo!(),
+                        };
+                        // do as float
+                        let val = match op.token_type {
+                            TokenType::Plus => lhs + rhs,
+                            TokenType::Minus => lhs - rhs,
+                            TokenType::Star => lhs * rhs,
+                            TokenType::Slash => lhs / rhs,
+                            _ => 0.0,
+                        };
+
+                        Value::Float(val)
+                    }
+                    _ => todo!(),
                 }
             }
             _ => {
