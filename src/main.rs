@@ -665,6 +665,7 @@ impl Parser {
                         if matches!(
                             op.token_type,
                             TokenType::Plus
+                                | TokenType::Minus
                                 | TokenType::Less
                                 | TokenType::LessEqual
                                 | TokenType::Greater
