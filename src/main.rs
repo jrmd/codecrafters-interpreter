@@ -14,11 +14,23 @@ enum Value {
     Null,
     Nil,
 }
+impl Value {
+    fn display(&self) -> String {
+        match self {
+            Value::Str(val) => format!("{}", val),
+            Value::Int(val) => format!("{}", val),
+            Value::Float(val) => format!("{:?}", val),
+            Value::Bool(val) => format!("{}", if *val { "true" } else { "false" }),
+            Value::Null => format!("{}", String::from("null")),
+            Value::Nil => format!("{}", String::from("nil")),
+        }
+    }
+}
 impl fmt::Display for Value {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Value::Str(val) => write!(f, "{}", val),
-            Value::Int(val) => write!(f, "{}", val),
+            Value::Int(val) => write!(f, "{:?}", val.to_owned() as f64),
             Value::Float(val) => write!(f, "{:?}", val),
             Value::Bool(val) => write!(f, "{}", if *val { "true" } else { "false" }),
             Value::Null => write!(f, "{}", String::from("null")),
@@ -435,11 +447,19 @@ impl Lexer {
                 Some(ch) => {
                     if ch.is_numeric() {
                         let number = self.take_number();
-                        Some(self.make_token(
-                            TokenType::Number,
-                            number.clone(),
-                            Some(Value::Float(number.parse().unwrap())),
-                        ))
+                        if !number.contains('.') {
+                            Some(self.make_token(
+                                TokenType::Number,
+                                number.clone(),
+                                Some(Value::Int(number.parse().unwrap())),
+                            ))
+                        } else {
+                            Some(self.make_token(
+                                TokenType::Number,
+                                number.clone(),
+                                Some(Value::Float(number.parse().unwrap())),
+                            ))
+                        }
                     } else if ch.is_alphabetic() || ch == '_' {
                         let ident = self.take_identifier();
                         let token_type = match ident.as_str() {
@@ -780,7 +800,7 @@ impl fmt::Display for EvaluationError {
 
 fn evaluate(exprs: Vec<Expr>) -> Result<(), EvaluationError> {
     for expr in exprs {
-        println!("{}", expr.evaluate());
+        println!("{}", expr.evaluate().display());
     }
     Ok(())
 }
