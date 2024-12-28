@@ -153,13 +153,15 @@ struct Token {
     token_type: TokenType,
     loxme: String,
     value: Option<Value>,
+    line: usize,
 }
 impl Token {
-    pub fn new(token_type: TokenType, loxme: String, value: Option<Value>) -> Self {
+    pub fn new(token_type: TokenType, loxme: String, value: Option<Value>, line: usize) -> Self {
         Self {
             token_type,
             loxme,
             value,
+            line,
         }
     }
     pub fn log(self) {
@@ -204,6 +206,10 @@ impl Lexer {
             pos: 0,
             errors: Vec::<LexerError>::new(),
         }
+    }
+
+    fn make_token(&self, token_type: TokenType, loxme: String, value: Option<Value>) -> Token {
+        Token::new(token_type, loxme, value, self.line)
     }
 
     fn take_whitespace(&mut self) {
@@ -300,59 +306,45 @@ impl Lexer {
                     if (self.tokens.last().is_some_and(|x| *x == TokenType::Eof)) {
                         None
                     } else {
-                        Some(Token::new(
-                            TokenType::Eof,
-                            String::from(""),
-                            Some(Value::Null),
-                        ))
+                        Some(self.make_token(TokenType::Eof, String::from(""), Some(Value::Null)))
                     }
                 }
-                Some('(') => Some(Token::new(
+                Some('(') => Some(self.make_token(
                     TokenType::LeftParen,
                     String::from("("),
                     Some(Value::Null),
                 )),
-                Some(')') => Some(Token::new(
+                Some(')') => Some(self.make_token(
                     TokenType::RightParen,
                     String::from(")"),
                     Some(Value::Null),
                 )),
-                Some('{') => Some(Token::new(
+                Some('{') => Some(self.make_token(
                     TokenType::LeftBrace,
                     String::from("{"),
                     Some(Value::Null),
                 )),
-                Some('}') => Some(Token::new(
+                Some('}') => Some(self.make_token(
                     TokenType::RightBrace,
                     String::from("}"),
                     Some(Value::Null),
                 )),
-                Some('*') => Some(Token::new(
-                    TokenType::Star,
-                    String::from("*"),
-                    Some(Value::Null),
-                )),
-                Some('.') => Some(Token::new(
-                    TokenType::Period,
-                    String::from("."),
-                    Some(Value::Null),
-                )),
-                Some(',') => Some(Token::new(
-                    TokenType::Comma,
-                    String::from(","),
-                    Some(Value::Null),
-                )),
-                Some('+') => Some(Token::new(
-                    TokenType::Plus,
-                    String::from("+"),
-                    Some(Value::Null),
-                )),
-                Some('-') => Some(Token::new(
-                    TokenType::Minus,
-                    String::from("-"),
-                    Some(Value::Null),
-                )),
-                Some(';') => Some(Token::new(
+                Some('*') => {
+                    Some(self.make_token(TokenType::Star, String::from("*"), Some(Value::Null)))
+                }
+                Some('.') => {
+                    Some(self.make_token(TokenType::Period, String::from("."), Some(Value::Null)))
+                }
+                Some(',') => {
+                    Some(self.make_token(TokenType::Comma, String::from(","), Some(Value::Null)))
+                }
+                Some('+') => {
+                    Some(self.make_token(TokenType::Plus, String::from("+"), Some(Value::Null)))
+                }
+                Some('-') => {
+                    Some(self.make_token(TokenType::Minus, String::from("-"), Some(Value::Null)))
+                }
+                Some(';') => Some(self.make_token(
                     TokenType::Semicolon,
                     String::from(";"),
                     Some(Value::Null),
@@ -361,13 +353,13 @@ impl Lexer {
                     if Some('=') == self.peek() {
                         self.index += 1;
                         self.pos += 1;
-                        Some(Token::new(
+                        Some(self.make_token(
                             TokenType::EqualEqual,
                             String::from("=="),
                             Some(Value::Null),
                         ))
                     } else {
-                        Some(Token::new(
+                        Some(self.make_token(
                             TokenType::Equal,
                             String::from("="),
                             Some(Value::Null),
@@ -378,30 +370,26 @@ impl Lexer {
                     if Some('=') == self.peek() {
                         self.index += 1;
                         self.pos += 1;
-                        Some(Token::new(
+                        Some(self.make_token(
                             TokenType::BangEqual,
                             String::from("!="),
                             Some(Value::Null),
                         ))
                     } else {
-                        Some(Token::new(
-                            TokenType::Bang,
-                            String::from("!"),
-                            Some(Value::Null),
-                        ))
+                        Some(self.make_token(TokenType::Bang, String::from("!"), Some(Value::Null)))
                     }
                 }
                 Some('>') => {
                     if Some('=') == self.peek() {
                         self.index += 1;
                         self.pos += 1;
-                        Some(Token::new(
+                        Some(self.make_token(
                             TokenType::GreaterEqual,
                             String::from(">="),
                             Some(Value::Null),
                         ))
                     } else {
-                        Some(Token::new(
+                        Some(self.make_token(
                             TokenType::Greater,
                             String::from(">"),
                             Some(Value::Null),
@@ -412,17 +400,13 @@ impl Lexer {
                     if Some('=') == self.peek() {
                         self.index += 1;
                         self.pos += 1;
-                        Some(Token::new(
+                        Some(self.make_token(
                             TokenType::LessEqual,
                             String::from("<="),
                             Some(Value::Null),
                         ))
                     } else {
-                        Some(Token::new(
-                            TokenType::Less,
-                            String::from("<"),
-                            Some(Value::Null),
-                        ))
+                        Some(self.make_token(TokenType::Less, String::from("<"), Some(Value::Null)))
                     }
                 }
                 Some('/') => {
@@ -432,7 +416,7 @@ impl Lexer {
                         self.take_until('\n');
                         None
                     } else {
-                        Some(Token::new(
+                        Some(self.make_token(
                             TokenType::Slash,
                             String::from("/"),
                             Some(Value::Null),
@@ -442,7 +426,7 @@ impl Lexer {
                 Some('"') => {
                     if let Some(val) = self.collect_until('"') {
                         let inner = val.clone()[1..val.len() - 1].to_string();
-                        Some(Token::new(TokenType::Str, val, Some(Value::Str(inner))))
+                        Some(self.make_token(TokenType::Str, val, Some(Value::Str(inner))))
                     } else {
                         self.report_error(LexerError::UnterminatedString(self.line, self.pos));
                         None
@@ -451,7 +435,7 @@ impl Lexer {
                 Some(ch) => {
                     if ch.is_numeric() {
                         let number = self.take_number();
-                        Some(Token::new(
+                        Some(self.make_token(
                             TokenType::Number,
                             number.clone(),
                             Some(Value::Float(number.parse().unwrap())),
@@ -477,7 +461,7 @@ impl Lexer {
                             "fun" => TokenType::Fun,
                             _ => TokenType::Identifier,
                         };
-                        Some(Token::new(token_type, ident, Some(Value::Null)))
+                        Some(self.make_token(token_type, ident, Some(Value::Null)))
                     } else {
                         self.report_error(LexerError::UnexpectedToken(self.line, self.pos, ch));
                         None
@@ -494,11 +478,8 @@ impl Lexer {
         }
 
         if !self.tokens.last().is_some_and(|x| *x == TokenType::Eof) {
-            self.tokens.push(Token::new(
-                TokenType::Eof,
-                String::from(""),
-                Some(Value::Null),
-            ));
+            self.tokens
+                .push(self.make_token(TokenType::Eof, String::from(""), Some(Value::Null)));
         }
 
         Ok(())
@@ -543,7 +524,23 @@ impl fmt::Display for Expr {
 }
 
 enum ParserError {
-    MissingToken(TokenType),
+    MissingToken(TokenType, usize),
+    ExpectedExpression(String, usize),
+}
+
+impl fmt::Display for ParserError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            ParserError::ExpectedExpression(str, line) => {
+                write!(f, "[line {}] Error at '{}': Expect expression.", line, str)
+            }
+            ParserError::MissingToken(token_type, line) => write!(
+                f,
+                "[line {}] Error at '{:?}': Expect expression.",
+                line, token_type
+            ),
+        }
+    }
 }
 
 // impl Debug for Expr {}
@@ -585,7 +582,10 @@ impl Parser {
 
         let mut skip = 0;
 
+        let mut last_line = 0;
+
         while let Some(token) = self.next() {
+            last_line = token.line;
             if token.token_type == start {
                 skip += 1;
             }
@@ -603,7 +603,7 @@ impl Parser {
         }
 
         if !found {
-            Err(ParserError::MissingToken(end))
+            Err(ParserError::MissingToken(end, last_line))
         } else {
             Ok(output)
         }
@@ -625,7 +625,26 @@ impl Parser {
             TokenType::Str => Some(Expr::Literal(token.value.unwrap().to_owned())),
             TokenType::LeftParen => {
                 let tokens = self.take_until(TokenType::LeftParen, TokenType::RightParen)?;
-                let expr = Expr::Group(Parser::new(tokens).parse()?);
+                let inner = Parser::new(tokens).parse();
+
+                if inner.is_err() {
+                    let inner = inner.err().unwrap();
+                    return match inner {
+                        ParserError::ExpectedExpression(_, _) => {
+                            let last_token = self
+                                .tokens
+                                .get(self.tokens_index - 1)
+                                .expect("prev token")
+                                .clone();
+                            Err(ParserError::ExpectedExpression(
+                                last_token.loxme,
+                                last_token.line,
+                            ))
+                        }
+                        _ => Err(inner),
+                    };
+                }
+                let expr = Expr::Group(inner.ok().expect("We exist"));
 
                 Some(expr)
             }
@@ -635,13 +654,23 @@ impl Parser {
             }
             TokenType::Minus => {
                 if depth > 0 || self.exprs.is_empty() {
-                    Some(Expr::Unary(
-                        token,
-                        Box::new(self.parse_one(depth + 1)?.expect("Minus!!")),
-                    ))
+                    let val = self.parse_one(depth + 1)?;
+                    if val.is_none() {
+                        return Err(ParserError::ExpectedExpression(token.loxme, token.line));
+                    }
+                    Some(Expr::Unary(token, Box::new(val.expect("expr"))))
                 } else {
-                    let lhs = self.exprs.pop().expect("lhs expr");
-                    let rhs = self.parse_one(depth + 1)?.expect("rhs expr");
+                    let lhs = self.exprs.pop();
+                    if lhs.is_none() {
+                        return Err(ParserError::ExpectedExpression(token.loxme, token.line));
+                    }
+                    let lhs = lhs.expect("lhs expr");
+
+                    let rhs = self.parse_one(depth + 1)?;
+                    if rhs.is_none() {
+                        return Err(ParserError::ExpectedExpression(token.loxme, token.line));
+                    }
+                    let rhs = rhs.expect("rhs expr");
                     Some(Expr::Binary(Box::new(lhs), token, Box::new(rhs)))
                 }
             }
@@ -652,13 +681,32 @@ impl Parser {
             | TokenType::GreaterEqual
             | TokenType::EqualEqual
             | TokenType::BangEqual => {
-                let lhs = self.exprs.pop().expect("lhs expr");
-                let rhs = self.parse_one(depth + 1)?.expect("rhs expr");
+                let lhs = self.exprs.pop();
+                if lhs.is_none() {
+                    return Err(ParserError::ExpectedExpression(token.loxme, token.line));
+                }
+                let lhs = lhs.expect("lhs expr");
+
+                let rhs = self.parse_one(depth + 1)?;
+                if rhs.is_none() {
+                    return Err(ParserError::ExpectedExpression(token.loxme, token.line));
+                }
+                let rhs = rhs.expect("rhs expr");
+
                 Some(Expr::Binary(Box::new(lhs), token, Box::new(rhs)))
             }
             TokenType::Star | TokenType::Slash => {
-                let lhs = self.exprs.pop().expect("lhs expr");
-                let rhs = Box::new(self.parse_one(depth + 1)?.expect("rhs expr"));
+                let lhs = self.exprs.pop();
+                if lhs.is_none() {
+                    return Err(ParserError::ExpectedExpression(token.loxme, token.line));
+                }
+                let lhs = lhs.expect("lhs expr");
+
+                let rhs = self.parse_one(depth + 1)?;
+                if rhs.is_none() {
+                    return Err(ParserError::ExpectedExpression(token.loxme, token.line));
+                }
+                let rhs = Box::new(rhs.expect("rhs expr"));
 
                 let op = match lhs.clone() {
                     Expr::Binary(_l, op, _r) => {
@@ -754,11 +802,13 @@ fn main() -> Result<(), Box<dyn Error>> {
                 std::process::exit(65);
             }
             let mut parser = Parser::new(lexer.tokens);
+            let res = parser.parse();
 
-            if parser.parse().is_ok() {
+            if res.is_ok() {
                 parser.dump();
             } else {
-                println!("Error!");
+                let res = res.err().unwrap();
+                println!("{res}")
             }
         }
         _ => {
