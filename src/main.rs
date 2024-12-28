@@ -12,6 +12,7 @@ enum Value {
     Float(f64),
     Bool(bool),
     Null,
+    Nil,
 }
 impl fmt::Display for Value {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -21,6 +22,7 @@ impl fmt::Display for Value {
             Value::Float(val) => write!(f, "{:?}", val),
             Value::Bool(val) => write!(f, "{}", if *val { "true" } else { "false" }),
             Value::Null => write!(f, "{}", String::from("null")),
+            Value::Nil => write!(f, "{}", String::from("nil")),
         }
     }
 }
@@ -564,7 +566,7 @@ impl Parser {
                 TokenType::Number => Expr::Literal(token.value.unwrap().to_owned()),
                 TokenType::True => Expr::Literal(Value::Bool(true)),
                 TokenType::False => Expr::Literal(Value::Bool(false)),
-                TokenType::Nil => Expr::Literal(token.value.unwrap().to_owned()),
+                TokenType::Nil => Expr::Literal(Value::Nil),
                 TokenType::Eof => return,
                 _ => todo!(),
             };
