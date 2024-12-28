@@ -539,6 +539,7 @@ impl Expr {
                 match token.token_type {
                     TokenType::Bang => match expr {
                         Value::Bool(val) => Value::Bool(!val),
+                        Value::Nil => Value::Bool(true),
                         _ => todo!("bang"),
                     },
 
