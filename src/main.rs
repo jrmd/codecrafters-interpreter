@@ -640,18 +640,37 @@ impl Parser {
                         Box::new(self.parse_one(depth + 1)?.expect("Minus!!")),
                     ))
                 } else {
-                    Some(Expr::Binary(
-                        Box::new(self.exprs.pop().expect("lhs expr")),
-                        token,
-                        Box::new(self.parse_one(depth + 1)?.expect("rhs expr")),
-                    ))
+                    let lhs = self.exprs.pop().expect("lhs expr");
+                    let rhs = self.parse_one(depth + 1)?.expect("rhs expr");
+                    println!("lhs: {}, op: {:?}, rhs: {}", lhs, token.token_type, rhs);
+                    Some(Expr::Binary(Box::new(lhs), token, Box::new(rhs)))
                 }
             }
-            TokenType::Star | TokenType::Slash | TokenType::Plus => Some(Expr::Binary(
-                Box::new(self.exprs.pop().expect("lhs expr")),
-                token,
-                Box::new(self.parse_one(depth + 1)?.expect("rhs expr")),
-            )),
+            TokenType::Star | TokenType::Slash | TokenType::Plus => {
+                let lhs = self.exprs.pop().expect("lhs expr");
+                let rhs = Box::new(self.parse_one(depth + 1)?.expect("rhs expr"));
+
+                let op = match lhs.clone() {
+                    Expr::Binary(_l, op, _r) => {
+                        if op == TokenType::Plus || op == TokenType::Minus {
+                            Some(Expr::Binary(
+                                _l,
+                                op,
+                                Box::new(Expr::Binary(_r, token.clone(), rhs.clone())),
+                            ))
+                        } else {
+                            None
+                        }
+                    }
+                    _ => None,
+                };
+
+                if op.is_some() {
+                    return Ok(op);
+                }
+
+                Some(Expr::Binary(Box::new(lhs), token, rhs))
+            }
             TokenType::Eof => return Ok(None),
             _ => todo!(),
         };
