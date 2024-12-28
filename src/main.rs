@@ -525,7 +525,7 @@ enum Expr {
 impl fmt::Display for Expr {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            Expr::Unary(op, expr) => f.write_fmt(format_args!("{} {expr}", op.loxme)),
+            Expr::Unary(op, expr) => f.write_fmt(format_args!("({} {expr})", op.loxme)),
             Expr::Literal(value) => f.write_fmt(format_args!("{}", value)),
             Expr::Binary(left, op, right) => {
                 f.write_fmt(format_args!("{} {left} {right}", op.loxme))
