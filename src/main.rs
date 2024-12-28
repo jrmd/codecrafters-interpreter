@@ -637,7 +637,7 @@ impl Parser {
                 continue;
             }
 
-            if !stack.is_empty() {
+            while !stack.is_empty() {
                 expr = Some(Expr::Unary(stack.pop().unwrap(), Box::new(expr.unwrap())));
             }
 
