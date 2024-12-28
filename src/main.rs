@@ -610,26 +610,38 @@ impl Parser {
     }
 
     pub fn parse(&mut self) -> Result<Vec<Expr>, ParserError> {
+        let mut stack: Vec<Token> = Vec::new();
         while let Some(token) = self.next() {
             let token = token.clone();
-            let expr = match token.token_type {
-                TokenType::Number => Expr::Literal(token.value.unwrap().to_owned()),
-                TokenType::True => Expr::Literal(Value::Bool(true)),
-                TokenType::False => Expr::Literal(Value::Bool(false)),
-                TokenType::Nil => Expr::Literal(Value::Nil),
-                TokenType::Str => Expr::Literal(token.value.unwrap().to_owned()),
+            let mut expr = match token.token_type {
+                TokenType::Number => Some(Expr::Literal(token.value.unwrap().to_owned())),
+                TokenType::True => Some(Expr::Literal(Value::Bool(true))),
+                TokenType::False => Some(Expr::Literal(Value::Bool(false))),
+                TokenType::Nil => Some(Expr::Literal(Value::Nil)),
+                TokenType::Str => Some(Expr::Literal(token.value.unwrap().to_owned())),
                 TokenType::LeftParen => {
-                    let mut tokens =
-                        self.take_until(TokenType::LeftParen, TokenType::RightParen)?;
+                    let tokens = self.take_until(TokenType::LeftParen, TokenType::RightParen)?;
                     let expr = Expr::Group(Parser::new(tokens).parse()?);
 
-                    expr
+                    Some(expr)
+                }
+                TokenType::Bang | TokenType::Minus => {
+                    stack.push(token);
+                    None
                 }
                 TokenType::Eof => return Ok(self.exprs.clone()),
                 _ => todo!(),
             };
 
-            self.exprs.push(expr);
+            if expr.is_none() {
+                continue;
+            }
+
+            if !stack.is_empty() {
+                expr = Some(Expr::Unary(stack.pop().unwrap(), Box::new(expr.unwrap())));
+            }
+
+            self.exprs.push(expr.unwrap());
         }
 
         Ok(self.exprs.clone())
