@@ -612,7 +612,7 @@ impl Expr {
                         let rhs = rhs.evaluate()?;
 
                         if !lhs.is_numeric() || !rhs.is_numeric() {
-                            todo!()
+                            return Err(EvaluationError::NumericOperands(op.line));
                         }
 
                         let lhs = match lhs {
