@@ -741,6 +741,16 @@ impl Parser {
         return None;
     }
 
+    fn peek(&mut self) -> Option<Token> {
+        let token = self.tokens.get(self.tokens_index);
+
+        if token.is_some() {
+            return Some(token.unwrap().clone());
+        }
+
+        return None;
+    }
+
     pub fn take_until(
         &mut self,
         start: TokenType,
@@ -776,6 +786,60 @@ impl Parser {
         } else {
             Ok(output)
         }
+    }
+
+    pub fn make_assignment(
+        &mut self,
+        ident: Option<Token>,
+        token: Token,
+    ) -> Result<Option<Expr>, ParserError> {
+        if ident.clone().is_some_and(|t| t == TokenType::Semicolon) {
+            return Ok(Some(Expr::Assignment(
+                token,
+                Box::new(Expr::Literal(Value::Nil)),
+            )));
+        }
+        if ident.clone().is_none() || ident.clone().unwrap() != TokenType::Identifier {
+            return Err(ParserError::ExpectedIdentifier(ident.unwrap_or(token)));
+        }
+        let ident = ident.unwrap();
+
+        let ass = self.next();
+        if ass.clone().is_none() {
+            return Err(ParserError::ExpectedIdentifier(ass.unwrap_or(token)));
+        }
+        if ass.clone().unwrap() == TokenType::Semicolon {
+            return Ok(Some(Expr::Assignment(
+                ident,
+                Box::new(Expr::Literal(Value::Nil)),
+            )));
+        }
+
+        if ass.clone().unwrap() != TokenType::Equal {
+            return Err(ParserError::ExpectedIdentifier(ass.unwrap_or(token)));
+        }
+
+        let mut tokens = self.take_until(TokenType::Var, TokenType::Semicolon)?;
+        tokens.push(Token::new(
+            TokenType::Semicolon,
+            String::from(";"),
+            Some(Value::Nil),
+            token.line,
+        ));
+
+        let inner = Parser::new(tokens).parse()?;
+        let inner = inner.first();
+
+        if inner.clone().is_none() {
+            return Err(ParserError::ExpectedExpression(
+                String::from(""),
+                token.line,
+            ));
+        }
+
+        let inner = inner.unwrap().to_owned();
+
+        Ok(Some(Expr::Assignment(ident, Box::new(inner))))
     }
 
     pub fn parse_one(&mut self, depth: usize) -> Result<Option<Expr>, ParserError> {
@@ -952,43 +1016,17 @@ impl Parser {
                 Some(Expr::Statement(token, Box::new(inner.unwrap().to_owned())))
             }
             TokenType::Var => {
-                let ident = self.next();
-                if ident.clone().is_none() || ident.clone().unwrap() != TokenType::Identifier {
-                    return Err(ParserError::ExpectedIdentifier(ident.unwrap_or(token)));
-                }
-                let ident = ident.unwrap();
-
-                let ass = self.next();
-                if ass.clone().is_none() {
-                    return Err(ParserError::ExpectedIdentifier(ass.unwrap_or(token)));
-                }
-                if ass.clone().unwrap() == TokenType::Semicolon {
-                    return Ok(Some(Expr::Assignment(
-                        ident,
-                        Box::new(Expr::Literal(Value::Nil)),
-                    )));
-                }
-
-                if ass.clone().unwrap() != TokenType::Equal {
-                    return Err(ParserError::ExpectedIdentifier(ass.unwrap_or(token)));
-                }
-
-                let tokens = self.take_until(TokenType::Var, TokenType::Semicolon)?;
-                let inner = Parser::new(tokens).parse()?;
-                let inner = inner.first();
-
-                if inner.clone().is_none() {
-                    return Err(ParserError::ExpectedExpression(
-                        String::from(""),
-                        token.line,
-                    ));
-                }
-
-                let inner = inner.unwrap().to_owned();
-
-                Some(Expr::Assignment(ident, Box::new(inner)))
+                let next = self.next();
+                self.make_assignment(next, token)?
             }
-            TokenType::Identifier => Some(Expr::Variable(token)),
+            TokenType::Identifier => {
+                let next = self.peek();
+                if next.is_some_and(|t| t == TokenType::Equal) {
+                    self.make_assignment(Some(token.clone()), token)?
+                } else {
+                    Some(Expr::Variable(token))
+                }
+            }
             TokenType::Eof => return Ok(None),
             TokenType::Semicolon => return Ok(None),
             _ => todo!("{:?}", token),
@@ -1192,8 +1230,8 @@ impl Runtime {
             },
             Expr::Assignment(token, expr) => {
                 let val = self.run_expr(*expr, scope)?;
-                scope.insert(token.loxme, val);
-                Ok(Value::Null)
+                scope.insert(token.loxme, val.clone());
+                Ok(val)
             }
             Expr::Variable(token) => {
                 if let Some(val) = scope.get(&token.loxme) {
