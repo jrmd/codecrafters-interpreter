@@ -545,9 +545,9 @@ enum Expr {
 }
 
 impl Expr {
-    pub fn evaluate(&self) -> Value {
+    pub fn evaluate(&self) -> Result<Value, EvaluationError> {
         match self {
-            Expr::Literal(value) => value.clone(),
+            Expr::Literal(value) => Ok(value.clone()),
             Expr::Group(exprs) => {
                 if exprs.len() > 1 {
                     todo!();
@@ -556,16 +556,16 @@ impl Expr {
                 exprs.get(0).unwrap().evaluate()
             }
             Expr::Unary(token, expr) => {
-                let expr = expr.to_owned().evaluate();
+                let expr = expr.to_owned().evaluate()?;
                 match token.token_type {
                     TokenType::Bang => match expr {
-                        Value::Bool(val) => Value::Bool(!val),
-                        Value::Nil => Value::Bool(true),
-                        _ => Value::Bool(false),
+                        Value::Bool(val) => Ok(Value::Bool(!val)),
+                        Value::Nil => Ok(Value::Bool(true)),
+                        _ => Ok(Value::Bool(false)),
                     },
 
                     TokenType::Minus => match expr {
-                        Value::Number(val) => Value::Number(-val),
+                        Value::Number(val) => Ok(Value::Number(-val)),
                         _ => todo!("minus"),
                     },
                     _ => todo!("token type"),
@@ -574,12 +574,12 @@ impl Expr {
             Expr::Binary(lhs, op, rhs) => {
                 match op.token_type {
                     TokenType::Minus | TokenType::Slash | TokenType::Star | TokenType::Plus => {
-                        let lhs = lhs.evaluate();
-                        let rhs = rhs.evaluate();
+                        let lhs = lhs.evaluate()?;
+                        let rhs = rhs.evaluate()?;
 
                         if !lhs.is_numeric() || !rhs.is_numeric() {
                             if lhs.is_string() && rhs.is_string() && *op == TokenType::Plus {
-                                return Value::Str(format!("{lhs}{rhs}"));
+                                return Ok(Value::Str(format!("{lhs}{rhs}")));
                             }
 
                             todo!()
@@ -603,14 +603,14 @@ impl Expr {
                             _ => 0.0,
                         };
 
-                        Value::Number(val)
+                        Ok(Value::Number(val))
                     }
                     TokenType::Less
                     | TokenType::LessEqual
                     | TokenType::GreaterEqual
                     | TokenType::Greater => {
-                        let lhs = lhs.evaluate();
-                        let rhs = rhs.evaluate();
+                        let lhs = lhs.evaluate()?;
+                        let rhs = rhs.evaluate()?;
 
                         if !lhs.is_numeric() || !rhs.is_numeric() {
                             todo!()
@@ -634,19 +634,19 @@ impl Expr {
                             _ => todo!(),
                         };
 
-                        Value::Bool(ret)
+                        Ok(Value::Bool(ret))
                     }
                     TokenType::EqualEqual => {
-                        let lhs = lhs.evaluate();
-                        let rhs = rhs.evaluate();
+                        let lhs = lhs.evaluate()?;
+                        let rhs = rhs.evaluate()?;
 
-                        Value::Bool(lhs == rhs)
+                        Ok(Value::Bool(lhs == rhs))
                     }
                     TokenType::BangEqual => {
-                        let lhs = lhs.evaluate();
-                        let rhs = rhs.evaluate();
+                        let lhs = lhs.evaluate()?;
+                        let rhs = rhs.evaluate()?;
 
-                        Value::Bool(lhs != rhs)
+                        Ok(Value::Bool(lhs != rhs))
                     }
                     _ => todo!(),
                 }
@@ -918,16 +918,27 @@ impl Parser {
 }
 
 #[derive(Debug)]
-enum EvaluationError {}
+enum EvaluationError {
+    UnaryNumberError(usize),
+}
 impl fmt::Display for EvaluationError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "")
+        match self {
+            Self::UnaryNumberError(line) => write!(f, "[line {line}]: Operand must be a number."),
+            _ => write!(f, ""),
+        }
     }
 }
 
 fn evaluate(exprs: Vec<Expr>) -> Result<(), EvaluationError> {
     for expr in exprs {
-        println!("{}", expr.evaluate().display());
+        let val = expr.evaluate();
+
+        if val.is_ok() {
+            println!("{}", val.ok().unwrap().display());
+        } else {
+            return Err(val.err().unwrap());
+        }
     }
     Ok(())
 }
@@ -1003,7 +1014,12 @@ fn main() -> Result<(), Box<dyn Error>> {
                 std::process::exit(65);
             }
 
-            evaluate(parser.exprs).unwrap();
+            let evaluated = evaluate(parser.exprs);
+
+            if evaluated.is_err() {
+                writeln!(io::stderr(), "{}", evaluated.err().unwrap()).unwrap();
+                std::process::exit(70);
+            }
         }
         _ => {
             writeln!(io::stderr(), "Unknown command: {}", command).unwrap();
