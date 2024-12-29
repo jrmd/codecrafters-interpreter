@@ -8,8 +8,7 @@ use std::io::{self, Write};
 #[derive(Debug, Clone, PartialEq)]
 enum Value {
     Str(String),
-    Int(i64),
-    Float(f64),
+    Number(f64),
     Bool(bool),
     Null,
     Nil,
@@ -18,31 +17,23 @@ impl Value {
     fn display(&self) -> String {
         match self {
             Value::Str(val) => format!("{}", val),
-            Value::Int(val) => format!("{}", val),
-            Value::Float(val) => format!("{:?}", val),
+            Value::Number(val) => format!("{}", val),
             Value::Bool(val) => format!("{}", if *val { "true" } else { "false" }),
             Value::Null => format!("{}", String::from("null")),
             Value::Nil => format!("{}", String::from("nil")),
         }
     }
 
-    fn is_int(&self) -> bool {
-        match self {
-            Value::Int(_) => true,
-            _ => false,
-        }
-    }
-
     fn is_float(&self) -> bool {
         match self {
-            Value::Float(_) => true,
+            Value::Number(_) => true,
             _ => false,
         }
     }
 
     fn is_numeric(&self) -> bool {
         match self {
-            Value::Float(_) | Value::Int(_) => true,
+            Value::Number(_) => true,
             _ => false,
         }
     }
@@ -51,8 +42,7 @@ impl fmt::Display for Value {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Value::Str(val) => write!(f, "{}", val),
-            Value::Int(val) => write!(f, "{:?}", val.to_owned() as f64),
-            Value::Float(val) => write!(f, "{:?}", val),
+            Value::Number(val) => write!(f, "{:?}", val),
             Value::Bool(val) => write!(f, "{}", if *val { "true" } else { "false" }),
             Value::Null => write!(f, "{}", String::from("null")),
             Value::Nil => write!(f, "{}", String::from("nil")),
@@ -472,13 +462,13 @@ impl Lexer {
                             Some(self.make_token(
                                 TokenType::Number,
                                 number.clone(),
-                                Some(Value::Int(number.parse().unwrap())),
+                                Some(Value::Number(number.parse().unwrap())),
                             ))
                         } else {
                             Some(self.make_token(
                                 TokenType::Number,
                                 number.clone(),
-                                Some(Value::Float(number.parse().unwrap())),
+                                Some(Value::Number(number.parse().unwrap())),
                             ))
                         }
                     } else if ch.is_alphabetic() || ch == '_' {
@@ -565,8 +555,7 @@ impl Expr {
                     },
 
                     TokenType::Minus => match expr {
-                        Value::Int(val) => Value::Int(-val),
-                        Value::Float(val) => Value::Float(-val),
+                        Value::Number(val) => Value::Number(-val),
                         _ => todo!("minus"),
                     },
                     _ => todo!("token type"),
@@ -582,60 +571,13 @@ impl Expr {
                             todo!();
                         }
 
-                        if lhs.is_int() != rhs.is_int() {
-                            let lhs = match lhs {
-                                Value::Int(v) => v as f64,
-                                Value::Float(v) => v,
-                                _ => todo!(),
-                            };
-
-                            let rhs = match rhs {
-                                Value::Int(v) => v as f64,
-                                Value::Float(v) => v,
-                                _ => todo!(),
-                            };
-                            // do as float
-
-                            let val = match op.token_type {
-                                TokenType::Plus => lhs + rhs,
-                                TokenType::Minus => lhs - rhs,
-                                TokenType::Star => lhs * rhs,
-                                TokenType::Slash => lhs / rhs,
-                                _ => 0.0,
-                            };
-
-                            return Value::Float(val);
-                        }
-
-                        // match type
-                        if lhs.is_int() {
-                            let lhs = match lhs {
-                                Value::Int(v) => v,
-                                _ => todo!(),
-                            };
-
-                            let rhs = match rhs {
-                                Value::Int(v) => v,
-                                _ => todo!(),
-                            };
-
-                            let val = match op.token_type {
-                                TokenType::Plus => lhs + rhs,
-                                TokenType::Minus => lhs - rhs,
-                                TokenType::Star => lhs * rhs,
-                                TokenType::Slash => lhs / rhs,
-                                _ => 0,
-                            };
-                            return Value::Int(val);
-                        }
-
                         let lhs = match lhs {
-                            Value::Float(v) => v,
+                            Value::Number(v) => v,
                             _ => todo!(),
                         };
 
                         let rhs = match rhs {
-                            Value::Float(v) => v,
+                            Value::Number(v) => v,
                             _ => todo!(),
                         };
                         // do as float
@@ -647,7 +589,7 @@ impl Expr {
                             _ => 0.0,
                         };
 
-                        Value::Float(val)
+                        Value::Number(val)
                     }
                     _ => todo!(),
                 }
