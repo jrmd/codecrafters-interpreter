@@ -920,8 +920,14 @@ impl Parser {
     }
 
     pub fn parse(&mut self) -> Result<Vec<Expr>, ParserError> {
-        while let Some(expr) = self.parse_one(0)? {
-            self.exprs.push(expr);
+        while let expr = self.parse_one(0)? {
+            if let Some(expr) = expr {
+                self.exprs.push(expr);
+            }
+
+            if self.tokens.len() < self.tokens_index {
+                break;
+            }
         }
 
         Ok(self.exprs.clone())
