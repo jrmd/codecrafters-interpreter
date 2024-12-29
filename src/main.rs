@@ -844,12 +844,35 @@ impl Parser {
                     return Err(ParserError::ExpectedExpression(token.loxme, token.line));
                 }
                 let lhs = lhs.expect("lhs expr");
-
                 let rhs = self.parse_one(depth + 1)?;
                 if rhs.is_none() {
                     return Err(ParserError::ExpectedExpression(token.loxme, token.line));
                 }
                 let rhs = rhs.expect("rhs expr");
+
+                let op = match lhs.clone() {
+                    Expr::Binary(_l, op, _r) => {
+                        if matches!(op.token_type, |TokenType::Less| TokenType::LessEqual
+                            | TokenType::Greater
+                            | TokenType::GreaterEqual
+                            | TokenType::EqualEqual
+                            | TokenType::BangEqual)
+                        {
+                            Some(Expr::Binary(
+                                _l,
+                                op,
+                                Box::new(Expr::Binary(_r, token.clone(), Box::new(rhs.clone()))),
+                            ))
+                        } else {
+                            None
+                        }
+                    }
+                    _ => None,
+                };
+
+                if op.is_some() {
+                    return Ok(op);
+                }
 
                 Some(Expr::Binary(Box::new(lhs), token, Box::new(rhs)))
             }
@@ -1199,7 +1222,7 @@ fn main() -> Result<(), Box<dyn Error>> {
             let mut lexer = Lexer::new(file_contents);
             let _ = lexer.tokenize();
             if lexer.has_error() {
-                // writeln!(io::stderr(), "lexer error").unwrap();
+                writeln!(io::stderr(), "lexer error").unwrap();
                 std::process::exit(65);
             }
             let mut parser = Parser::new(lexer.tokens);
@@ -1216,7 +1239,7 @@ fn main() -> Result<(), Box<dyn Error>> {
             let run_state = runtime.run();
 
             if run_state.is_err() {
-                // writeln!(io::stderr(), "runtime").unwrap();
+                writeln!(io::stderr(), "runtime {}", run_state.err().unwrap()).unwrap();
                 std::process::exit(70)
             }
         }
