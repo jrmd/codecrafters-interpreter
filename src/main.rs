@@ -553,7 +553,7 @@ impl Expr {
                     todo!();
                 }
 
-                exprs.get(0).unwrap().evaluate()
+                exprs.first().unwrap().evaluate()
             }
             Expr::Unary(token, expr) => {
                 let expr = expr.to_owned().evaluate()?;
@@ -566,7 +566,7 @@ impl Expr {
 
                     TokenType::Minus => match expr {
                         Value::Number(val) => Ok(Value::Number(-val)),
-                        _ => todo!("minus"),
+                        _ => Err(EvaluationError::UnaryNumberError(token.line)),
                     },
                     _ => todo!("token type"),
                 }
