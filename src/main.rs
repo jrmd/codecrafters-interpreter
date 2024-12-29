@@ -546,6 +546,7 @@ enum Expr {
     Statement(Token, Box<Expr>),
     Assignment(Token, Box<Expr>),
     Variable(Token),
+    Block(Vec<Expr>),
 }
 
 impl Expr {
@@ -681,6 +682,16 @@ impl fmt::Display for Expr {
             Expr::Statement(op, expr) => write!(f, "({} {expr}", op.loxme),
             Expr::Assignment(op, expr) => write!(f, "{} = {expr}", op.loxme),
             Expr::Variable(op) => write!(f, "{}", op.loxme),
+
+            Expr::Block(exprs) => write!(
+                f,
+                "{{\n{}\n}}",
+                exprs
+                    .iter()
+                    .map(|ex| format!("\t{}", ex))
+                    .collect::<Vec<String>>()
+                    .join("\n")
+            ),
         }
     }
 }
@@ -1029,6 +1040,11 @@ impl Parser {
                     Some(Expr::Variable(token))
                 }
             }
+            TokenType::LeftBrace => {
+                let tokens = self.take_until(TokenType::LeftBrace, TokenType::RightBrace, false)?;
+                let inner = Parser::new(tokens).parse()?;
+                Some(Expr::Block(inner))
+            }
             TokenType::Eof => return Ok(None),
             TokenType::Semicolon => return Ok(None),
             _ => todo!("{:?}", token),
@@ -1241,6 +1257,13 @@ impl Runtime {
                 } else {
                     Err(RuntimeError::UndefinedVariable(token))
                 }
+            }
+            Expr::Block(exprs) => {
+                let mut new_scope = scope.clone();
+                for expr in exprs.iter() {
+                    self.run_expr(expr.to_owned(), &mut new_scope)?;
+                }
+                Ok(Value::Null)
             }
         }
     }
