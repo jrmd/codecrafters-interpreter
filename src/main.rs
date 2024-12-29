@@ -37,6 +37,16 @@ impl Value {
             _ => false,
         }
     }
+
+    fn type_string(&self) -> String {
+        match self {
+            Value::Nil => String::from("nil"),
+            Value::Null => String::from("nil"),
+            Value::Str(_) => String::from("string"),
+            Value::Number(_) => String::from("number"),
+            Value::Bool(_) => String::from("bool"),
+        }
+    }
 }
 impl fmt::Display for Value {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -625,6 +635,18 @@ impl Expr {
                         };
 
                         Value::Bool(ret)
+                    }
+                    TokenType::EqualEqual => {
+                        let lhs = lhs.evaluate();
+                        let rhs = rhs.evaluate();
+
+                        Value::Bool(lhs == rhs)
+                    }
+                    TokenType::BangEqual => {
+                        let lhs = lhs.evaluate();
+                        let rhs = rhs.evaluate();
+
+                        Value::Bool(lhs != rhs)
                     }
                     _ => todo!(),
                 }
