@@ -953,13 +953,13 @@ impl Parser {
             }
             TokenType::Var => {
                 let ident = self.next();
-                if ident.clone().is_none_or(|tok| tok != TokenType::Identifier) {
+                if ident.clone().is_none() || ident.clone().unwrap() != TokenType::Identifier {
                     return Err(ParserError::ExpectedIdentifier(ident.unwrap_or(token)));
                 }
                 let ident = ident.unwrap();
 
                 let ass = self.next();
-                if ass.clone().is_none_or(|tok| tok != TokenType::Equal) {
+                if ass.clone().is_none() || ass.clone().unwrap() != TokenType::Equal {
                     return Err(ParserError::ExpectedIdentifier(ass.unwrap_or(token)));
                 }
 
