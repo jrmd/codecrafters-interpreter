@@ -755,6 +755,7 @@ impl Parser {
         &mut self,
         start: TokenType,
         end: TokenType,
+        silent: bool,
     ) -> Result<Vec<Token>, ParserError> {
         let mut output = Vec::<Token>::new();
         let mut found = false;
@@ -781,7 +782,7 @@ impl Parser {
             output.push(token);
         }
 
-        if !found {
+        if !found && !silent {
             Err(ParserError::MissingToken(end, last_line))
         } else {
             Ok(output)
@@ -819,7 +820,7 @@ impl Parser {
             return Err(ParserError::ExpectedIdentifier(ass.unwrap_or(token)));
         }
 
-        let mut tokens = self.take_until(TokenType::Var, TokenType::Semicolon)?;
+        let mut tokens = self.take_until(TokenType::Var, TokenType::Semicolon, true)?;
         tokens.push(Token::new(
             TokenType::Semicolon,
             String::from(";"),
@@ -831,6 +832,7 @@ impl Parser {
         let inner = inner.first();
 
         if inner.clone().is_none() {
+            println!("Parser errror no semi colon inni");
             return Err(ParserError::ExpectedExpression(
                 String::from(""),
                 token.line,
@@ -857,7 +859,7 @@ impl Parser {
             TokenType::Nil => Some(Expr::Literal(Value::Nil)),
             TokenType::Str => Some(Expr::Literal(token.value.unwrap().to_owned())),
             TokenType::LeftParen => {
-                let tokens = self.take_until(TokenType::LeftParen, TokenType::RightParen)?;
+                let tokens = self.take_until(TokenType::LeftParen, TokenType::RightParen, false)?;
                 let inner = Parser::new(tokens).parse();
 
                 if inner.is_err() {
@@ -1002,7 +1004,7 @@ impl Parser {
                 Some(Expr::Binary(Box::new(lhs), token, rhs))
             }
             TokenType::Print => {
-                let tokens = self.take_until(TokenType::Print, TokenType::Semicolon)?;
+                let tokens = self.take_until(TokenType::Print, TokenType::Semicolon, false)?;
                 let inner = Parser::new(tokens).parse()?;
                 let inner = inner.first();
 
@@ -1021,7 +1023,7 @@ impl Parser {
             }
             TokenType::Identifier => {
                 let next = self.peek();
-                if next.is_some_and(|t| t == TokenType::Equal) {
+                if next.clone().is_some_and(|t| t == TokenType::Equal) {
                     self.make_assignment(Some(token.clone()), token)?
                 } else {
                     Some(Expr::Variable(token))
