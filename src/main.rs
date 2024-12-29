@@ -49,6 +49,14 @@ impl Value {
             Value::Bool(_) => String::from("bool"),
         }
     }
+    fn is_truthy(&self) -> bool {
+        match self {
+            Value::Number(val) => *val > 0.0,
+            Value::Str(_) => true,
+            Value::Bool(val) => *val,
+            _ => false,
+        }
+    }
 }
 impl fmt::Display for Value {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -548,6 +556,7 @@ enum Expr {
     Assignment(Token, Box<Expr>, bool),
     Variable(Token),
     Block(Vec<Expr>),
+    Conditional(Token, Box<Expr>, Box<Expr>),
 }
 
 impl Expr {
@@ -697,6 +706,11 @@ impl fmt::Display for Expr {
                     .map(|ex| format!("\t{}", ex))
                     .collect::<Vec<String>>()
                     .join("\n")
+            ),
+            Expr::Conditional(op, conditional, statement) => write!(
+                f,
+                "({:?} {} then {})",
+                op.token_type, conditional, statement
             ),
         }
     }
@@ -1054,6 +1068,45 @@ impl Parser {
                 let inner = Parser::new(tokens).parse()?;
                 Some(Expr::Block(inner))
             }
+            TokenType::If => {
+                let next = self.next();
+                if next.is_none() || next.clone().unwrap().to_owned() != TokenType::LeftParen {
+                    return Err(ParserError::MissingToken(
+                        TokenType::LeftParen,
+                        next.clone().unwrap_or(token).line,
+                    ));
+                }
+
+                let conditional =
+                    self.take_until(TokenType::LeftParen, TokenType::RightParen, false)?;
+                let conditional = Parser::new(conditional).parse()?;
+
+                if conditional.is_empty() {
+                    return Err(ParserError::ExpectedExpression(
+                        String::from("conditional"),
+                        token.line,
+                    ));
+                }
+
+                let conditional = conditional.first().unwrap();
+
+                let expr = self.parse_one(depth + 1)?;
+
+                if expr.is_none() {
+                    return Err(ParserError::ExpectedExpression(
+                        String::from("conditional"),
+                        token.line,
+                    ));
+                }
+
+                let expr = expr.unwrap();
+
+                Some(Expr::Conditional(
+                    token,
+                    Box::new(conditional.to_owned()),
+                    Box::new(expr),
+                ))
+            }
             TokenType::Eof => return Ok(None),
             TokenType::Semicolon => return Ok(None),
             _ => todo!("{:?}", token),
@@ -1316,6 +1369,21 @@ impl Runtime {
                     self.run_expr(expr.to_owned(), scope)?;
                 }
                 scope.leave();
+                Ok(Value::Null)
+            }
+            Expr::Conditional(op, condition, expr) => {
+                match op.token_type {
+                    TokenType::If => {
+                        scope.enter();
+                        let value = self.run_expr(*condition, scope)?;
+                        if value.is_truthy() {
+                            self.run_expr(*expr, scope)?;
+                        }
+                        scope.leave();
+                    }
+                    _ => todo!(),
+                }
+
                 Ok(Value::Null)
             }
         }
