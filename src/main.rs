@@ -566,7 +566,7 @@ impl Expr {
 
                     TokenType::Minus => match expr {
                         Value::Number(val) => Ok(Value::Number(-val)),
-                        _ => Err(EvaluationError::UnaryNumberError(token.line)),
+                        _ => Err(EvaluationError::NumericOperands(token.line)),
                     },
                     _ => todo!("token type"),
                 }
@@ -581,8 +581,7 @@ impl Expr {
                             if lhs.is_string() && rhs.is_string() && *op == TokenType::Plus {
                                 return Ok(Value::Str(format!("{lhs}{rhs}")));
                             }
-
-                            todo!()
+                            return Err(EvaluationError::NumericOperands(op.line));
                         }
 
                         let lhs = match lhs {
@@ -919,12 +918,12 @@ impl Parser {
 
 #[derive(Debug)]
 enum EvaluationError {
-    UnaryNumberError(usize),
+    NumericOperands(usize),
 }
 impl fmt::Display for EvaluationError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            Self::UnaryNumberError(line) => write!(f, "[line {line}]: Operand must be a number."),
+            Self::NumericOperands(line) => write!(f, "[line {line}]: Operands must be a number."),
             _ => write!(f, ""),
         }
     }
