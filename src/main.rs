@@ -269,12 +269,12 @@ impl Lexer {
         self.errors.len() > 0
     }
 
-    fn peek(&self) -> Option<char> {
-        self.input.chars().nth(self.index + 1)
+    fn peek(&self) -> Option<(usize, char)> {
+        self.input.char_indices().nth(self.index + 1)
     }
 
     fn take_until(&mut self, ch: char) {
-        while let Some(curr) = self.peek() {
+        while let Some((_, curr)) = self.peek() {
             if ch != curr {
                 self.index += 1;
                 self.pos += 1;
@@ -287,7 +287,7 @@ impl Lexer {
 
     fn collect_until(&mut self, ch: char) -> Option<String> {
         let from = self.index;
-        while let Some(curr) = self.peek() {
+        while let Some((index, curr)) = self.peek() {
             self.index += 1;
             self.pos += 1;
 
@@ -295,7 +295,7 @@ impl Lexer {
                 continue;
             }
 
-            return Some(self.input[from..self.index + 1].to_string());
+            return Some(self.input[from..index + 1].to_string());
         }
 
         None
@@ -303,7 +303,7 @@ impl Lexer {
 
     fn take_number(&mut self) -> String {
         let from = self.index;
-        while let Some(ch) = self.peek() {
+        while let Some((_, ch)) = self.peek() {
             if ch != '.' && !ch.is_numeric() {
                 break;
             }
@@ -317,7 +317,7 @@ impl Lexer {
 
     fn take_identifier(&mut self) -> String {
         let from = self.index;
-        while let Some(ch) = self.peek() {
+        while let Some((index, ch)) = self.peek() {
             if ch != '_' && !ch.is_alphanumeric() {
                 break;
             }
@@ -383,7 +383,7 @@ impl Lexer {
                     Some(Value::Null),
                 )),
                 Some('=') => {
-                    if Some('=') == self.peek() {
+                    if self.peek().is_some_and(|(_, ch)| ch == '=') {
                         self.index += 1;
                         self.pos += 1;
                         Some(self.make_token(
@@ -400,7 +400,7 @@ impl Lexer {
                     }
                 }
                 Some('!') => {
-                    if Some('=') == self.peek() {
+                    if self.peek().is_some_and(|(_, ch)| ch == '=') {
                         self.index += 1;
                         self.pos += 1;
                         Some(self.make_token(
@@ -413,7 +413,7 @@ impl Lexer {
                     }
                 }
                 Some('>') => {
-                    if Some('=') == self.peek() {
+                    if self.peek().is_some_and(|(_, ch)| ch == '=') {
                         self.index += 1;
                         self.pos += 1;
                         Some(self.make_token(
@@ -430,7 +430,7 @@ impl Lexer {
                     }
                 }
                 Some('<') => {
-                    if Some('=') == self.peek() {
+                    if self.peek().is_some_and(|(_, ch)| ch == '=') {
                         self.index += 1;
                         self.pos += 1;
                         Some(self.make_token(
@@ -443,7 +443,7 @@ impl Lexer {
                     }
                 }
                 Some('/') => {
-                    if Some('/') == self.peek() {
+                    if self.peek().is_some_and(|(_, ch)| ch == '/') {
                         self.index += 1;
                         self.pos += 1;
                         self.take_until('\n');
