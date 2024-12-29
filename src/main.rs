@@ -542,6 +542,7 @@ enum Expr {
     Literal(Value),
     Unary(Token, Box<Expr>),
     Group(Vec<Expr>),
+    Statement(Token, Box<Expr>),
 }
 
 impl Expr {
@@ -674,6 +675,7 @@ impl fmt::Display for Expr {
                     .collect::<Vec<String>>()
                     .join(" ")
             )),
+            Expr::Statement(op, expr) => write!(f, "({} {expr}", op.loxme),
         }
     }
 }
@@ -688,11 +690,12 @@ impl fmt::Display for ParserError {
         match self {
             ParserError::ExpectedExpression(str, line) => {
                 write!(f, "[line {}] Error at '{}': Expect expression.", line, str)
-            } // ParserError::MissingToken(token_type, line) => write!(
-            //     f,
-            //     "[line {}] Error at '{:?}': Expect expression.",
-            //     line, token_type
-            // ),
+            }
+            ParserError::MissingToken(token_type, line) => write!(
+                f,
+                "[line {}] Error at '{:?}': Expect expression.",
+                line, token_type
+            ),
             _ => write!(f, ""),
         }
     }
@@ -894,6 +897,15 @@ impl Parser {
 
                 Some(Expr::Binary(Box::new(lhs), token, rhs))
             }
+            TokenType::Print => {
+                let tokens = self.take_until(TokenType::Print, TokenType::Semicolon)?;
+                let inner = Parser::new(tokens).parse()?;
+
+                Some(Expr::Statement(
+                    token,
+                    Box::new(inner.first().unwrap().to_owned()),
+                ))
+            }
             TokenType::Eof => return Ok(None),
             _ => todo!(),
         };
@@ -940,6 +952,152 @@ fn evaluate(exprs: Vec<Expr>) -> Result<(), EvaluationError> {
         }
     }
     Ok(())
+}
+
+#[derive(Debug)]
+enum RuntimeError {
+    NumericOperands(usize),
+}
+impl fmt::Display for RuntimeError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::NumericOperands(line) => write!(f, "[line {line}]: Operands must be a number."),
+            _ => write!(f, ""),
+        }
+    }
+}
+
+struct Runtime {
+    exprs: Vec<Expr>,
+}
+
+impl Runtime {
+    pub fn new(exprs: Vec<Expr>) -> Self {
+        Self { exprs }
+    }
+
+    fn run_expr(&self, expr: Expr) -> Result<Value, RuntimeError> {
+        match expr {
+            Expr::Literal(value) => Ok(value.clone()),
+            Expr::Group(exprs) => {
+                if exprs.len() > 1 {
+                    todo!();
+                }
+
+                self.run_expr(exprs.first().unwrap().to_owned())
+            }
+            Expr::Unary(token, expr) => {
+                let expr = self.run_expr(*expr.to_owned())?;
+                match token.token_type {
+                    TokenType::Bang => match expr {
+                        Value::Bool(val) => Ok(Value::Bool(!val)),
+                        Value::Nil => Ok(Value::Bool(true)),
+                        _ => Ok(Value::Bool(false)),
+                    },
+
+                    TokenType::Minus => match expr {
+                        Value::Number(val) => Ok(Value::Number(-val)),
+                        _ => Err(RuntimeError::NumericOperands(token.line)),
+                    },
+                    _ => todo!("token type"),
+                }
+            }
+            Expr::Binary(lhs, op, rhs) => {
+                match op.token_type {
+                    TokenType::Minus | TokenType::Slash | TokenType::Star | TokenType::Plus => {
+                        let lhs = self.run_expr(*lhs)?;
+                        let rhs = self.run_expr(*rhs)?;
+
+                        if !lhs.is_numeric() || !rhs.is_numeric() {
+                            if lhs.is_string() && rhs.is_string() && op == TokenType::Plus {
+                                return Ok(Value::Str(format!("{lhs}{rhs}")));
+                            }
+                            return Err(RuntimeError::NumericOperands(op.line));
+                        }
+
+                        let lhs = match lhs {
+                            Value::Number(v) => v,
+                            _ => todo!(),
+                        };
+
+                        let rhs = match rhs {
+                            Value::Number(v) => v,
+                            _ => todo!(),
+                        };
+                        // do as float
+                        let val = match op.token_type {
+                            TokenType::Plus => lhs + rhs,
+                            TokenType::Minus => lhs - rhs,
+                            TokenType::Star => lhs * rhs,
+                            TokenType::Slash => lhs / rhs,
+                            _ => 0.0,
+                        };
+
+                        Ok(Value::Number(val))
+                    }
+                    TokenType::Less
+                    | TokenType::LessEqual
+                    | TokenType::GreaterEqual
+                    | TokenType::Greater => {
+                        let lhs = self.run_expr(*lhs)?;
+                        let rhs = self.run_expr(*rhs)?;
+
+                        if !lhs.is_numeric() || !rhs.is_numeric() {
+                            return Err(RuntimeError::NumericOperands(op.line));
+                        }
+
+                        let lhs = match lhs {
+                            Value::Number(v) => v,
+                            _ => todo!(),
+                        };
+
+                        let rhs = match rhs {
+                            Value::Number(v) => v,
+                            _ => todo!(),
+                        };
+
+                        let ret = match op.token_type {
+                            TokenType::Less => lhs < rhs,
+                            TokenType::LessEqual => lhs <= rhs,
+                            TokenType::GreaterEqual => lhs >= rhs,
+                            TokenType::Greater => lhs > rhs,
+                            _ => todo!(),
+                        };
+
+                        Ok(Value::Bool(ret))
+                    }
+                    TokenType::EqualEqual => {
+                        let lhs = self.run_expr(*lhs)?;
+                        let rhs = self.run_expr(*rhs)?;
+
+                        Ok(Value::Bool(lhs == rhs))
+                    }
+                    TokenType::BangEqual => {
+                        let lhs = self.run_expr(*lhs)?;
+                        let rhs = self.run_expr(*rhs)?;
+
+                        Ok(Value::Bool(lhs != rhs))
+                    }
+                    _ => todo!(),
+                }
+            }
+            Expr::Statement(token, expr) => match token.token_type {
+                TokenType::Print => {
+                    let args = self.run_expr(*expr)?;
+                    println!("{}", args);
+                    Ok(Value::Nil)
+                }
+                _ => todo!(),
+            },
+        }
+    }
+
+    pub fn run(&mut self) -> Result<(), RuntimeError> {
+        for expr in self.exprs.iter() {
+            self.run_expr(expr.clone())?;
+        }
+        Ok(())
+    }
 }
 
 fn main() -> Result<(), Box<dyn Error>> {
@@ -1018,6 +1176,36 @@ fn main() -> Result<(), Box<dyn Error>> {
             if evaluated.is_err() {
                 writeln!(io::stderr(), "{}", evaluated.err().unwrap()).unwrap();
                 std::process::exit(70);
+            }
+        }
+        "run" => {
+            let file_contents = fs::read_to_string(filename).unwrap_or_else(|_| {
+                writeln!(io::stderr(), "Failed to read file {}", filename).unwrap();
+                String::new()
+            });
+
+            let mut lexer = Lexer::new(file_contents);
+            let _ = lexer.tokenize();
+            if lexer.has_error() {
+                writeln!(io::stderr(), "lexer error").unwrap();
+                std::process::exit(65);
+            }
+            let mut parser = Parser::new(lexer.tokens);
+            let res = parser.parse();
+
+            if res.is_err() {
+                let res = res.err().unwrap();
+                writeln!(io::stderr(), "parser {res}").unwrap();
+                std::process::exit(65);
+            }
+
+            let mut runtime = Runtime::new(res.ok().unwrap());
+
+            let run_state = runtime.run();
+
+            if run_state.is_err() {
+                writeln!(io::stderr(), "runtime").unwrap();
+                std::process::exit(70)
             }
         }
         _ => {
