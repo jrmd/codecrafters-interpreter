@@ -1,4 +1,5 @@
 use core::fmt;
+use std::collections::HashMap;
 use std::env;
 use std::error::Error;
 use std::fmt::Debug;
@@ -543,6 +544,8 @@ enum Expr {
     Unary(Token, Box<Expr>),
     Group(Vec<Expr>),
     Statement(Token, Box<Expr>),
+    Assignment(Token, Box<Expr>),
+    Variable(Token),
 }
 
 impl Expr {
@@ -676,6 +679,8 @@ impl fmt::Display for Expr {
                     .join(" ")
             )),
             Expr::Statement(op, expr) => write!(f, "({} {expr}", op.loxme),
+            Expr::Assignment(op, expr) => write!(f, "{} = {expr}", op.loxme),
+            Expr::Variable(op) => write!(f, "{}", op.loxme),
         }
     }
 }
@@ -683,6 +688,7 @@ impl fmt::Display for Expr {
 enum ParserError {
     MissingToken(TokenType, usize),
     ExpectedExpression(String, usize),
+    ExpectedIdentifier(Token),
 }
 
 impl fmt::Display for ParserError {
@@ -695,6 +701,11 @@ impl fmt::Display for ParserError {
                 f,
                 "[line {}] Error at '{:?}': Expect expression.",
                 line, token_type
+            ),
+            Self::ExpectedIdentifier(token) => write!(
+                f,
+                "[line {}] Error at '{:?}': Expected identifier.",
+                token.line, token.loxme,
             ),
             _ => write!(f, ""),
         }
@@ -940,6 +951,34 @@ impl Parser {
 
                 Some(Expr::Statement(token, Box::new(inner.unwrap().to_owned())))
             }
+            TokenType::Var => {
+                let ident = self.next();
+                if ident.clone().is_none_or(|tok| tok != TokenType::Identifier) {
+                    return Err(ParserError::ExpectedIdentifier(ident.unwrap_or(token)));
+                }
+                let ident = ident.unwrap();
+
+                let ass = self.next();
+                if ass.clone().is_none_or(|tok| tok != TokenType::Equal) {
+                    return Err(ParserError::ExpectedIdentifier(ass.unwrap_or(token)));
+                }
+
+                let tokens = self.take_until(TokenType::Var, TokenType::Semicolon)?;
+                let inner = Parser::new(tokens).parse()?;
+                let inner = inner.first();
+
+                if inner.clone().is_none() {
+                    return Err(ParserError::ExpectedExpression(
+                        String::from(""),
+                        token.line,
+                    ));
+                }
+
+                let inner = inner.unwrap().to_owned();
+
+                Some(Expr::Assignment(ident, Box::new(inner)))
+            }
+            TokenType::Identifier => Some(Expr::Variable(token)),
             TokenType::Eof => return Ok(None),
             TokenType::Semicolon => return Ok(None),
             _ => todo!("{:?}", token),
@@ -998,11 +1037,18 @@ fn evaluate(exprs: Vec<Expr>) -> Result<(), EvaluationError> {
 #[derive(Debug)]
 enum RuntimeError {
     NumericOperands(usize),
+    UndefinedVariable(Token),
 }
 impl fmt::Display for RuntimeError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Self::NumericOperands(line) => write!(f, "[line {line}]: Operands must be a number."),
+
+            Self::UndefinedVariable(token) => write!(
+                f,
+                "[line {}] Error at '{:?}': Undefined Variable.",
+                token.line, token.loxme,
+            ),
             _ => write!(f, ""),
         }
     }
@@ -1017,7 +1063,11 @@ impl Runtime {
         Self { exprs }
     }
 
-    fn run_expr(&self, expr: Expr) -> Result<Value, RuntimeError> {
+    fn run_expr(
+        &mut self,
+        expr: Expr,
+        scope: &mut HashMap<String, Value>,
+    ) -> Result<Value, RuntimeError> {
         match expr {
             Expr::Literal(value) => Ok(value.clone()),
             Expr::Group(exprs) => {
@@ -1025,10 +1075,10 @@ impl Runtime {
                     todo!();
                 }
 
-                self.run_expr(exprs.first().unwrap().to_owned())
+                self.run_expr(exprs.first().unwrap().to_owned(), scope)
             }
             Expr::Unary(token, expr) => {
-                let expr = self.run_expr(*expr.to_owned())?;
+                let expr = self.run_expr(*expr.to_owned(), scope)?;
                 match token.token_type {
                     TokenType::Bang => match expr {
                         Value::Bool(val) => Ok(Value::Bool(!val)),
@@ -1046,8 +1096,8 @@ impl Runtime {
             Expr::Binary(lhs, op, rhs) => {
                 match op.token_type {
                     TokenType::Minus | TokenType::Slash | TokenType::Star | TokenType::Plus => {
-                        let lhs = self.run_expr(*lhs)?;
-                        let rhs = self.run_expr(*rhs)?;
+                        let lhs = self.run_expr(*lhs, scope)?;
+                        let rhs = self.run_expr(*rhs, scope)?;
 
                         if !lhs.is_numeric() || !rhs.is_numeric() {
                             if lhs.is_string() && rhs.is_string() && op == TokenType::Plus {
@@ -1080,8 +1130,8 @@ impl Runtime {
                     | TokenType::LessEqual
                     | TokenType::GreaterEqual
                     | TokenType::Greater => {
-                        let lhs = self.run_expr(*lhs)?;
-                        let rhs = self.run_expr(*rhs)?;
+                        let lhs = self.run_expr(*lhs, scope)?;
+                        let rhs = self.run_expr(*rhs, scope)?;
 
                         if !lhs.is_numeric() || !rhs.is_numeric() {
                             return Err(RuntimeError::NumericOperands(op.line));
@@ -1108,14 +1158,14 @@ impl Runtime {
                         Ok(Value::Bool(ret))
                     }
                     TokenType::EqualEqual => {
-                        let lhs = self.run_expr(*lhs)?;
-                        let rhs = self.run_expr(*rhs)?;
+                        let lhs = self.run_expr(*lhs, scope)?;
+                        let rhs = self.run_expr(*rhs, scope)?;
 
                         Ok(Value::Bool(lhs == rhs))
                     }
                     TokenType::BangEqual => {
-                        let lhs = self.run_expr(*lhs)?;
-                        let rhs = self.run_expr(*rhs)?;
+                        let lhs = self.run_expr(*lhs, scope)?;
+                        let rhs = self.run_expr(*rhs, scope)?;
 
                         Ok(Value::Bool(lhs != rhs))
                     }
@@ -1124,18 +1174,31 @@ impl Runtime {
             }
             Expr::Statement(token, expr) => match token.token_type {
                 TokenType::Print => {
-                    let args = self.run_expr(*expr)?;
+                    let args = self.run_expr(*expr, scope)?;
                     println!("{}", args.display());
                     Ok(Value::Nil)
                 }
                 _ => todo!(),
             },
+            Expr::Assignment(token, expr) => {
+                let val = self.run_expr(*expr, scope)?;
+                scope.insert(token.loxme, val);
+                Ok(Value::Null)
+            }
+            Expr::Variable(token) => {
+                if let Some(val) = scope.get(&token.loxme) {
+                    Ok(val.clone().to_owned())
+                } else {
+                    Err(RuntimeError::UndefinedVariable(token))
+                }
+            }
         }
     }
 
     pub fn run(&mut self) -> Result<(), RuntimeError> {
-        for expr in self.exprs.iter() {
-            self.run_expr(expr.clone())?;
+        let mut scope = HashMap::<String, Value>::new();
+        for expr in self.exprs.clone().iter() {
+            self.run_expr(expr.clone(), &mut scope)?;
         }
         Ok(())
     }
