@@ -595,6 +595,37 @@ impl Expr {
 
                         Value::Number(val)
                     }
+                    TokenType::Less
+                    | TokenType::LessEqual
+                    | TokenType::GreaterEqual
+                    | TokenType::Greater => {
+                        let lhs = lhs.evaluate();
+                        let rhs = rhs.evaluate();
+
+                        if !lhs.is_numeric() || !rhs.is_numeric() {
+                            todo!()
+                        }
+
+                        let lhs = match lhs {
+                            Value::Number(v) => v,
+                            _ => todo!(),
+                        };
+
+                        let rhs = match rhs {
+                            Value::Number(v) => v,
+                            _ => todo!(),
+                        };
+
+                        let ret = match op.token_type {
+                            TokenType::Less => lhs < rhs,
+                            TokenType::LessEqual => lhs <= rhs,
+                            TokenType::GreaterEqual => lhs >= rhs,
+                            TokenType::Greater => lhs > rhs,
+                            _ => todo!(),
+                        };
+
+                        Value::Bool(ret)
+                    }
                     _ => todo!(),
                 }
             }
