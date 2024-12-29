@@ -959,7 +959,17 @@ impl Parser {
                 let ident = ident.unwrap();
 
                 let ass = self.next();
-                if ass.clone().is_none() || ass.clone().unwrap() != TokenType::Equal {
+                if ass.clone().is_none() {
+                    return Err(ParserError::ExpectedIdentifier(ass.unwrap_or(token)));
+                }
+                if ass.clone().unwrap() == TokenType::Semicolon {
+                    return Ok(Some(Expr::Assignment(
+                        ident,
+                        Box::new(Expr::Literal(Value::Nil)),
+                    )));
+                }
+
+                if ass.clone().unwrap() != TokenType::Equal {
                     return Err(ParserError::ExpectedIdentifier(ass.unwrap_or(token)));
                 }
 
