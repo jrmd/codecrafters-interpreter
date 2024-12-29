@@ -24,9 +24,9 @@ impl Value {
         }
     }
 
-    fn is_float(&self) -> bool {
+    fn is_string(&self) -> bool {
         match self {
-            Value::Number(_) => true,
+            Value::Str(_) => true,
             _ => false,
         }
     }
@@ -568,7 +568,11 @@ impl Expr {
                         let rhs = rhs.evaluate();
 
                         if !lhs.is_numeric() || !rhs.is_numeric() {
-                            todo!();
+                            if lhs.is_string() && rhs.is_string() && *op == TokenType::Plus {
+                                return Value::Str(format!("{lhs}{rhs}"));
+                            }
+
+                            todo!()
                         }
 
                         let lhs = match lhs {
