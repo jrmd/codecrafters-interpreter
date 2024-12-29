@@ -850,28 +850,34 @@ impl Parser {
                 }
                 let rhs = rhs.expect("rhs expr");
 
-                let op = match lhs.clone() {
-                    Expr::Binary(_l, op, _r) => {
-                        if matches!(op.token_type, |TokenType::Less| TokenType::LessEqual
-                            | TokenType::Greater
-                            | TokenType::GreaterEqual
-                            | TokenType::EqualEqual
-                            | TokenType::BangEqual)
-                        {
-                            Some(Expr::Binary(
-                                _l,
-                                op,
-                                Box::new(Expr::Binary(_r, token.clone(), Box::new(rhs.clone()))),
-                            ))
-                        } else {
-                            None
+                if token == TokenType::Plus {
+                    let op = match lhs.clone() {
+                        Expr::Binary(_l, op, _r) => {
+                            if matches!(op.token_type, |TokenType::Less| TokenType::LessEqual
+                                | TokenType::Greater
+                                | TokenType::GreaterEqual
+                                | TokenType::EqualEqual
+                                | TokenType::BangEqual)
+                            {
+                                Some(Expr::Binary(
+                                    _l,
+                                    op,
+                                    Box::new(Expr::Binary(
+                                        _r,
+                                        token.clone(),
+                                        Box::new(rhs.clone()),
+                                    )),
+                                ))
+                            } else {
+                                None
+                            }
                         }
-                    }
-                    _ => None,
-                };
+                        _ => None,
+                    };
 
-                if op.is_some() {
-                    return Ok(op);
+                    if op.is_some() {
+                        return Ok(op);
+                    }
                 }
 
                 Some(Expr::Binary(Box::new(lhs), token, Box::new(rhs)))
