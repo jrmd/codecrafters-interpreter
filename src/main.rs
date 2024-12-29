@@ -1,9 +1,10 @@
 use core::fmt;
-use std::collections::HashMap;
+use std::collections::{HashMap, LinkedList};
 use std::env;
 use std::error::Error;
 use std::fmt::Debug;
 use std::fs;
+use std::hash::Hash;
 use std::io::{self, Write};
 
 #[derive(Debug, Clone, PartialEq)]
@@ -544,7 +545,7 @@ enum Expr {
     Unary(Token, Box<Expr>),
     Group(Vec<Expr>),
     Statement(Token, Box<Expr>),
-    Assignment(Token, Box<Expr>),
+    Assignment(Token, Box<Expr>, bool),
     Variable(Token),
     Block(Vec<Expr>),
 }
@@ -680,7 +681,12 @@ impl fmt::Display for Expr {
                     .join(" ")
             )),
             Expr::Statement(op, expr) => write!(f, "({} {expr}", op.loxme),
-            Expr::Assignment(op, expr) => write!(f, "{} = {expr}", op.loxme),
+            Expr::Assignment(op, expr, reassign) => write!(
+                f,
+                "{} {} = {expr}",
+                if *reassign { "" } else { "var" },
+                op.loxme
+            ),
             Expr::Variable(op) => write!(f, "{}", op.loxme),
 
             Expr::Block(exprs) => write!(
@@ -804,11 +810,13 @@ impl Parser {
         &mut self,
         ident: Option<Token>,
         token: Token,
+        reassign: bool,
     ) -> Result<Option<Expr>, ParserError> {
         if ident.clone().is_some_and(|t| t == TokenType::Semicolon) {
             return Ok(Some(Expr::Assignment(
                 token,
                 Box::new(Expr::Literal(Value::Nil)),
+                reassign,
             )));
         }
         if ident.clone().is_none() || ident.clone().unwrap() != TokenType::Identifier {
@@ -824,6 +832,7 @@ impl Parser {
             return Ok(Some(Expr::Assignment(
                 ident,
                 Box::new(Expr::Literal(Value::Nil)),
+                reassign,
             )));
         }
 
@@ -852,7 +861,7 @@ impl Parser {
 
         let inner = inner.unwrap().to_owned();
 
-        Ok(Some(Expr::Assignment(ident, Box::new(inner))))
+        Ok(Some(Expr::Assignment(ident, Box::new(inner), reassign)))
     }
 
     pub fn parse_one(&mut self, depth: usize) -> Result<Option<Expr>, ParserError> {
@@ -1030,12 +1039,12 @@ impl Parser {
             }
             TokenType::Var => {
                 let next = self.next();
-                self.make_assignment(next, token)?
+                self.make_assignment(next, token, false)?
             }
             TokenType::Identifier => {
                 let next = self.peek();
                 if next.clone().is_some_and(|t| t == TokenType::Equal) {
-                    self.make_assignment(Some(token.clone()), token)?
+                    self.make_assignment(Some(token.clone()), token, true)?
                 } else {
                     Some(Expr::Variable(token))
                 }
@@ -1120,6 +1129,53 @@ impl fmt::Display for RuntimeError {
     }
 }
 
+#[derive(Debug, Clone)]
+struct Scope {
+    list: Vec<HashMap<String, Value>>,
+}
+
+impl Scope {
+    pub fn new() -> Self {
+        Self {
+            list: vec![HashMap::new()],
+        }
+    }
+
+    pub fn enter(&mut self) {
+        self.list.push(HashMap::new());
+    }
+
+    pub fn leave(&mut self) {
+        self.list.pop();
+    }
+
+    pub fn get(&self, key: String) -> Option<&Value> {
+        for map in self.list.iter().rev() {
+            if map.contains_key(&key) {
+                return map.get(&key);
+            }
+        }
+
+        None
+    }
+
+    pub fn set(&mut self, key: String, value: Value, reassign: bool) {
+        for map in self.list.iter_mut().rev() {
+            if reassign && map.contains_key(&key) {
+                map.insert(key, value);
+                break;
+            }
+
+            if reassign {
+                continue;
+            }
+
+            map.insert(key, value);
+            break;
+        }
+    }
+}
+
 struct Runtime {
     exprs: Vec<Expr>,
 }
@@ -1129,11 +1185,7 @@ impl Runtime {
         Self { exprs }
     }
 
-    fn run_expr(
-        &mut self,
-        expr: Expr,
-        scope: &mut HashMap<String, Value>,
-    ) -> Result<Value, RuntimeError> {
+    fn run_expr(&mut self, expr: Expr, scope: &mut Scope) -> Result<Value, RuntimeError> {
         match expr {
             Expr::Literal(value) => Ok(value.clone()),
             Expr::Group(exprs) => {
@@ -1246,30 +1298,31 @@ impl Runtime {
                 }
                 _ => todo!(),
             },
-            Expr::Assignment(token, expr) => {
+            Expr::Assignment(token, expr, reassign) => {
                 let val = self.run_expr(*expr, scope)?;
-                scope.insert(token.loxme, val.clone());
+                scope.set(token.loxme, val.clone(), reassign);
                 Ok(val)
             }
             Expr::Variable(token) => {
-                if let Some(val) = scope.get(&token.loxme) {
+                if let Some(val) = scope.get(token.loxme.clone()) {
                     Ok(val.clone().to_owned())
                 } else {
                     Err(RuntimeError::UndefinedVariable(token))
                 }
             }
             Expr::Block(exprs) => {
-                let mut new_scope = scope.clone();
+                scope.enter();
                 for expr in exprs.iter() {
-                    self.run_expr(expr.to_owned(), &mut new_scope)?;
+                    self.run_expr(expr.to_owned(), scope)?;
                 }
+                scope.leave();
                 Ok(Value::Null)
             }
         }
     }
 
     pub fn run(&mut self) -> Result<(), RuntimeError> {
-        let mut scope = HashMap::<String, Value>::new();
+        let mut scope = Scope::new();
         for expr in self.exprs.clone().iter() {
             self.run_expr(expr.clone(), &mut scope)?;
         }
