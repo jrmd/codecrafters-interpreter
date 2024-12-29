@@ -912,7 +912,8 @@ impl Parser {
                 Some(Expr::Statement(token, Box::new(inner.unwrap().to_owned())))
             }
             TokenType::Eof => return Ok(None),
-            _ => todo!(),
+            TokenType::Semicolon => return Ok(None),
+            _ => todo!("{:?}", token),
         };
 
         Ok(expr)
