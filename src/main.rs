@@ -1084,7 +1084,7 @@ impl Runtime {
             Expr::Statement(token, expr) => match token.token_type {
                 TokenType::Print => {
                     let args = self.run_expr(*expr)?;
-                    println!("{}", args);
+                    println!("{}", args.display());
                     Ok(Value::Nil)
                 }
                 _ => todo!(),
@@ -1187,7 +1187,7 @@ fn main() -> Result<(), Box<dyn Error>> {
             let mut lexer = Lexer::new(file_contents);
             let _ = lexer.tokenize();
             if lexer.has_error() {
-                writeln!(io::stderr(), "lexer error").unwrap();
+                // writeln!(io::stderr(), "lexer error").unwrap();
                 std::process::exit(65);
             }
             let mut parser = Parser::new(lexer.tokens);
@@ -1195,7 +1195,7 @@ fn main() -> Result<(), Box<dyn Error>> {
 
             if res.is_err() {
                 let res = res.err().unwrap();
-                writeln!(io::stderr(), "parser {res}").unwrap();
+                writeln!(io::stderr(), "{res}").unwrap();
                 std::process::exit(65);
             }
 
@@ -1204,7 +1204,7 @@ fn main() -> Result<(), Box<dyn Error>> {
             let run_state = runtime.run();
 
             if run_state.is_err() {
-                writeln!(io::stderr(), "runtime").unwrap();
+                // writeln!(io::stderr(), "runtime").unwrap();
                 std::process::exit(70)
             }
         }
