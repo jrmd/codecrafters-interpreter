@@ -900,16 +900,16 @@ impl Parser {
             TokenType::Print => {
                 let tokens = self.take_until(TokenType::Print, TokenType::Semicolon)?;
                 let inner = Parser::new(tokens).parse()?;
+                let inner = inner.first();
 
-                Some(Expr::Statement(
-                    token,
-                    Box::new(
-                        inner
-                            .first()
-                            .unwrap_or(&Expr::Literal(Value::Null))
-                            .to_owned(),
-                    ),
-                ))
+                if inner.is_none() {
+                    return Err(ParserError::ExpectedExpression(
+                        String::from(""),
+                        token.line,
+                    ));
+                }
+
+                Some(Expr::Statement(token, Box::new(inner.unwrap().to_owned())))
             }
             TokenType::Eof => return Ok(None),
             _ => todo!(),
