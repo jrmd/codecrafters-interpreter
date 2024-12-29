@@ -16,11 +16,11 @@ enum Value {
 impl Value {
     fn display(&self) -> String {
         match self {
-            Value::Str(val) => format!("{}", val),
+            Value::Str(val) => val.to_owned(),
             Value::Number(val) => format!("{}", val),
-            Value::Bool(val) => format!("{}", if *val { "true" } else { "false" }),
-            Value::Null => format!("{}", String::from("null")),
-            Value::Nil => format!("{}", String::from("nil")),
+            Value::Bool(val) => String::from(if *val { "true" } else { "false" }),
+            Value::Null => String::from(""),
+            Value::Nil => String::from("nil"),
         }
     }
 
@@ -903,7 +903,12 @@ impl Parser {
 
                 Some(Expr::Statement(
                     token,
-                    Box::new(inner.first().unwrap().to_owned()),
+                    Box::new(
+                        inner
+                            .first()
+                            .unwrap_or(&Expr::Literal(Value::Null))
+                            .to_owned(),
+                    ),
                 ))
             }
             TokenType::Eof => return Ok(None),
