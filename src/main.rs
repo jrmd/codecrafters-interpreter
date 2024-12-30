@@ -1478,21 +1478,24 @@ impl Runtime {
             }
             Expr::Logical(op, a, b) => {
                 scope.enter();
+                let a = self.run_expr(*a, scope)?;
                 let val = match op.token_type {
                     TokenType::Or => {
-                        self.run_expr(*a, scope)?.is_truthy()
-                            || self.run_expr(*b, scope)?.is_truthy()
+                        if a.is_truthy() {
+                            a
+                        } else {
+                            self.run_expr(*b, scope)?
+                        }
                     }
                     TokenType::And => {
-                        self.run_expr(*a, scope)?.is_truthy()
-                            && self.run_expr(*b, scope)?.is_truthy()
+                        Value::Bool(a.is_truthy() && self.run_expr(*b, scope)?.is_truthy())
                     }
                     _ => todo!(),
                 };
 
                 scope.leave();
 
-                Ok(Value::Bool(val))
+                Ok(val)
             }
         }
     }
