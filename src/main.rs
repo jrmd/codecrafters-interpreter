@@ -557,6 +557,7 @@ enum Expr {
     Variable(Token),
     Block(Vec<Expr>),
     Conditional(Token, Box<Expr>, Box<Expr>),
+    ControlGroup(Vec<Expr>),
 }
 
 impl Expr {
@@ -707,11 +708,20 @@ impl fmt::Display for Expr {
                     .collect::<Vec<String>>()
                     .join("\n")
             ),
-            Expr::Conditional(op, conditional, statement) => write!(
-                f,
-                "({:?} {} then {})",
-                op.token_type, conditional, statement
-            ),
+            Expr::Conditional(_, conditional, statement) => {
+                write!(f, "(conditional {} then {})", conditional, statement)
+            }
+            Expr::ControlGroup(exprs) => {
+                write!(
+                    f,
+                    "(control \n{}\n)",
+                    exprs
+                        .iter()
+                        .map(|ex| format!("\t{}", ex))
+                        .collect::<Vec<String>>()
+                        .join("\n")
+                )
+            }
         }
     }
 }
@@ -1101,10 +1111,48 @@ impl Parser {
 
                 let expr = expr.unwrap();
 
-                Some(Expr::Conditional(
+                let mut exprs = Vec::<Expr>::new();
+                exprs.push(Expr::Conditional(
                     token,
                     Box::new(conditional.to_owned()),
                     Box::new(expr),
+                ));
+
+                while self.peek().is_some_and(|t| t == TokenType::Else) {
+                    let expr = self.parse_one(depth + 1)?;
+                    if expr.is_none() {
+                        break;
+                    }
+                    let expr = expr.unwrap();
+
+                    match expr {
+                        Expr::Conditional(_, _, _) => exprs.push(expr),
+                        Expr::ControlGroup(mut group) => exprs.append(&mut group),
+                        _ => todo!(),
+                    }
+                }
+
+                Some(Expr::ControlGroup(exprs))
+            }
+            TokenType::Else => {
+                if self.peek().is_some_and(|t| t == TokenType::If) {
+                    return self.parse_one(depth + 1);
+                }
+
+                let block = self.parse_one(depth + 1)?;
+                if block.is_none() {
+                    return Err(ParserError::ExpectedExpression(
+                        String::from("conditional"),
+                        token.line,
+                    ));
+                }
+
+                let block = block.unwrap();
+
+                Some(Expr::Conditional(
+                    token,
+                    Box::new(Expr::Literal(Value::Bool(true))),
+                    Box::new(block),
                 ))
             }
             TokenType::Eof => return Ok(None),
@@ -1372,16 +1420,36 @@ impl Runtime {
                 Ok(Value::Null)
             }
             Expr::Conditional(op, condition, expr) => {
+                let mut handled = false;
                 match op.token_type {
                     TokenType::If => {
                         scope.enter();
                         let value = self.run_expr(*condition, scope)?;
                         if value.is_truthy() {
                             self.run_expr(*expr, scope)?;
+                            handled = true;
                         }
                         scope.leave();
                     }
+                    TokenType::Else => {
+                        scope.enter();
+                        self.run_expr(*expr, scope)?;
+                        handled = true;
+                        scope.leave();
+                    }
                     _ => todo!(),
+                }
+
+                Ok(Value::Bool(handled))
+            }
+            Expr::ControlGroup(exprs) => {
+                for expr in exprs {
+                    if self
+                        .run_expr(expr, scope)
+                        .is_ok_and(|x| x == Value::Bool(true))
+                    {
+                        break;
+                    }
                 }
 
                 Ok(Value::Null)
