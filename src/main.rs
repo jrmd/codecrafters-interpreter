@@ -1488,7 +1488,11 @@ impl Runtime {
                         }
                     }
                     TokenType::And => {
-                        Value::Bool(a.is_truthy() && self.run_expr(*b, scope)?.is_truthy())
+                        if !a.is_truthy() {
+                            Value::Bool(false)
+                        } else {
+                            self.run_expr(*b, scope)?
+                        }
                     }
                     _ => todo!(),
                 };
