@@ -559,6 +559,7 @@ enum Expr {
     Conditional(Token, Box<Expr>, Box<Expr>),
     ControlGroup(Vec<Expr>),
     Logical(Token, Box<Expr>, Box<Expr>),
+    While(Token, Box<Expr>, Box<Expr>),
 }
 
 impl Expr {
@@ -726,6 +727,7 @@ impl fmt::Display for Expr {
             Expr::Logical(op, a, b) => {
                 write!(f, "({} {} {})", op.loxme, a, b)
             }
+            Expr::While(op, a, b) => write!(f, "({} {} {})", op.loxme, a, b),
         }
     }
 }
@@ -1177,6 +1179,41 @@ impl Parser {
 
                 Some(Expr::Logical(token, Box::new(a), Box::new(b)))
             }
+            TokenType::While => {
+                let next = self.next();
+                if next.is_none() || next.clone().unwrap().to_owned() != TokenType::LeftParen {
+                    return Err(ParserError::MissingToken(
+                        TokenType::LeftParen,
+                        next.clone().unwrap_or(token).line,
+                    ));
+                }
+
+                let conditional =
+                    self.take_until(TokenType::LeftParen, TokenType::RightParen, false)?;
+                let conditional = Parser::new(conditional).parse()?;
+
+                if conditional.is_empty() {
+                    return Err(ParserError::ExpectedExpression(
+                        String::from("conditional"),
+                        token.line,
+                    ));
+                }
+
+                let conditional = conditional.first().unwrap().to_owned();
+
+                let expr = self.parse_one(depth + 1)?;
+
+                if expr.is_none() {
+                    return Err(ParserError::ExpectedExpression(
+                        String::from("conditional"),
+                        token.line,
+                    ));
+                }
+
+                let expr = expr.unwrap();
+
+                Some(Expr::While(token, Box::new(conditional), Box::new(expr)))
+            }
             TokenType::Eof => return Ok(None),
             TokenType::Semicolon => return Ok(None),
             _ => todo!("{:?}", token),
@@ -1500,6 +1537,20 @@ impl Runtime {
                 scope.leave();
 
                 Ok(val)
+            }
+            Expr::While(_, condition, block) => {
+                scope.enter();
+
+                while self.run_expr(*condition.clone(), scope)?.is_truthy() {
+                    scope.enter();
+                    // println!("{:?}", scope.get(String::from("foo")));
+                    self.run_expr(*block.clone(), scope)?;
+                    scope.leave();
+                }
+
+                scope.leave();
+
+                Ok(Value::Null)
             }
         }
     }
