@@ -558,6 +558,7 @@ enum Expr {
     Block(Vec<Expr>),
     Conditional(Token, Box<Expr>, Box<Expr>),
     ControlGroup(Vec<Expr>),
+    Logical(Token, Box<Expr>, Box<Expr>),
 }
 
 impl Expr {
@@ -721,6 +722,9 @@ impl fmt::Display for Expr {
                         .collect::<Vec<String>>()
                         .join("\n")
                 )
+            }
+            Expr::Logical(op, a, b) => {
+                write!(f, "({} {} {})", op.loxme, a, b)
             }
         }
     }
@@ -1155,6 +1159,24 @@ impl Parser {
                     Box::new(block),
                 ))
             }
+            TokenType::Or | TokenType::And => {
+                let a = self.exprs.pop();
+
+                if a.is_none() {
+                    return Err(ParserError::ExpectedExpression(token.loxme, token.line));
+                }
+
+                let a = a.unwrap();
+                let b = self.parse_one(depth + 1)?;
+
+                if b.is_none() {
+                    return Err(ParserError::ExpectedExpression(token.loxme, token.line));
+                }
+
+                let b = b.unwrap();
+
+                Some(Expr::Logical(token, Box::new(a), Box::new(b)))
+            }
             TokenType::Eof => return Ok(None),
             TokenType::Semicolon => return Ok(None),
             _ => todo!("{:?}", token),
@@ -1453,6 +1475,24 @@ impl Runtime {
                 }
 
                 Ok(Value::Null)
+            }
+            Expr::Logical(op, a, b) => {
+                scope.enter();
+                let val = match op.token_type {
+                    TokenType::Or => {
+                        self.run_expr(*a, scope)?.is_truthy()
+                            || self.run_expr(*b, scope)?.is_truthy()
+                    }
+                    TokenType::And => {
+                        self.run_expr(*a, scope)?.is_truthy()
+                            && self.run_expr(*b, scope)?.is_truthy()
+                    }
+                    _ => todo!(),
+                };
+
+                scope.leave();
+
+                Ok(Value::Bool(val))
             }
         }
     }
