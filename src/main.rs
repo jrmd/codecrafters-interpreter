@@ -1214,7 +1214,7 @@ impl Parser {
 
                 let inner = self.take_until(TokenType::LeftParen, TokenType::RightParen, false)?;
 
-                let mut clauses = Vec::<Expr>::new();
+                let mut clauses = Vec::<Expr>::with_capacity(3);
                 let mut pieces = inner.split(|t| t.token_type == TokenType::Semicolon);
                 let mut i = 0;
                 while let Some(tokens) = pieces.next() {
