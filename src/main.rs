@@ -535,6 +535,17 @@ enum Expr {
     ControlGroup(Vec<Expr>),
     Logical(Token, Box<Expr>, Box<Expr>),
     While(Token, Box<Expr>, Box<Expr>),
+    For(
+        Token,
+        //assignment
+        Box<Option<Expr>>,
+        // condition
+        Box<Option<Expr>>,
+        // after
+        Box<Option<Expr>>,
+        // run
+        Box<Expr>,
+    ),
 }
 
 impl Expr {
@@ -651,6 +662,10 @@ impl Expr {
     }
 }
 
+fn nil_expr() -> Expr {
+    Expr::Literal(Value::Nil)
+}
+
 impl fmt::Display for Expr {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
@@ -703,6 +718,15 @@ impl fmt::Display for Expr {
                 write!(f, "({} {} {})", op.loxme, a, b)
             }
             Expr::While(op, a, b) => write!(f, "({} {} {})", op.loxme, a, b),
+            Expr::For(_, assignment, condition, after, block) => {
+                write!(
+                    f,
+                    "(for {} {} {} {block})",
+                    assignment.clone().or(Some(nil_expr())).unwrap().to_owned(),
+                    condition.clone().or(Some(nil_expr())).unwrap().to_owned(),
+                    after.clone().or(Some(nil_expr())).unwrap().to_owned()
+                )
+            }
         }
     }
 }
@@ -1179,6 +1203,59 @@ impl Parser {
 
                 Some(Expr::While(token, Box::new(conditional), Box::new(expr)))
             }
+            TokenType::For => {
+                let next = self.next();
+                if next.is_none() || next.clone().unwrap() != TokenType::LeftParen {
+                    return Err(ParserError::MissingToken(
+                        TokenType::LeftParen,
+                        next.clone().unwrap_or(token).line,
+                    ));
+                }
+
+                let inner = self.take_until(TokenType::LeftParen, TokenType::RightParen, false)?;
+
+                let mut clauses = Vec::<Expr>::new();
+                let mut pieces = inner.split(|t| t.token_type == TokenType::Semicolon);
+                let mut i = 0;
+                while let Some(tokens) = pieces.next() {
+                    let mut tokens = tokens.to_vec();
+                    tokens.push(Token::new(
+                        TokenType::Semicolon,
+                        String::from(";"),
+                        Some(Value::Null),
+                        token.line,
+                    ));
+                    let expr = Parser::new(tokens.to_vec()).parse()?;
+
+                    if expr.is_empty() {
+                        i += 1;
+                        continue;
+                    }
+
+                    // >1 should probs error?
+                    clauses.insert(i, expr.first().unwrap().to_owned());
+                    i += 1;
+                }
+
+                let expr = self.parse_one(depth + 1)?;
+
+                if expr.is_none() {
+                    return Err(ParserError::ExpectedExpression(
+                        String::from("conditional"),
+                        token.line,
+                    ));
+                }
+
+                let expr = expr.unwrap();
+
+                Some(Expr::For(
+                    token,
+                    Box::new(clauses.first().map(|t| t.to_owned())),
+                    Box::new(clauses.get(1).map(|t| t.to_owned())),
+                    Box::new(clauses.get(2).map(|t| t.to_owned())),
+                    Box::new(expr),
+                ))
+            }
             TokenType::Eof => return Ok(None),
             TokenType::Semicolon => return Ok(None),
             _ => todo!("{:?}", token),
@@ -1511,6 +1588,37 @@ impl Runtime {
                     // println!("{:?}", scope.get(String::from("foo")));
                     self.run_expr(*block.clone(), scope)?;
                     scope.leave();
+                }
+
+                scope.leave();
+
+                Ok(Value::Null)
+            }
+            Expr::For(_, assignment, condition, after, block) => {
+                scope.enter();
+
+                if assignment.is_some() {
+                    self.run_expr(assignment.unwrap(), scope)?;
+                }
+
+                let condition = if condition.is_none() {
+                    Expr::Literal(Value::Bool(true))
+                } else {
+                    condition.unwrap()
+                };
+
+                loop {
+                    if !self.run_expr(condition.clone(), scope)?.is_truthy() {
+                        break;
+                    }
+
+                    scope.enter();
+                    self.run_expr(*block.clone(), scope)?;
+                    scope.leave();
+
+                    if after.is_some() {
+                        self.run_expr(after.clone().unwrap(), scope)?;
+                    }
                 }
 
                 scope.leave();
