@@ -1,11 +1,9 @@
 use core::fmt;
-use std::collections::{HashMap, LinkedList};
+use std::collections::HashMap;
 use std::env;
 use std::error::Error;
 use std::fmt::Debug;
 use std::fs;
-use std::hash::Hash;
-use std::io::{self, Write};
 
 #[derive(Debug, Clone, PartialEq)]
 enum Value {
@@ -27,28 +25,13 @@ impl Value {
     }
 
     fn is_string(&self) -> bool {
-        match self {
-            Value::Str(_) => true,
-            _ => false,
-        }
+        matches!(self, Value::Str(_))
     }
 
     fn is_numeric(&self) -> bool {
-        match self {
-            Value::Number(_) => true,
-            _ => false,
-        }
+        matches!(self, Value::Number(_))
     }
 
-    fn type_string(&self) -> String {
-        match self {
-            Value::Nil => String::from("nil"),
-            Value::Null => String::from("nil"),
-            Value::Str(_) => String::from("string"),
-            Value::Number(_) => String::from("number"),
-            Value::Bool(_) => String::from("bool"),
-        }
-    }
     fn is_truthy(&self) -> bool {
         match self {
             Value::Number(val) => *val > 0.0,
@@ -116,57 +99,59 @@ enum TokenType {
 
     Eof,
 }
-impl TokenType {
-    pub fn to_string(self) -> String {
-        let val = match self {
-            TokenType::LeftParen => "LEFT_PAREN",
-            TokenType::RightParen => "RIGHT_PAREN",
-            TokenType::LeftBrace => "LEFT_BRACE",
-            TokenType::RightBrace => "RIGHT_BRACE",
-            TokenType::Comma => "COMMA",
-            TokenType::Period => "DOT",
-            TokenType::Minus => "MINUS",
-            TokenType::Plus => "PLUS",
-            TokenType::Semicolon => "SEMICOLON",
-            TokenType::Slash => "SLASH",
-            TokenType::Star => "STAR",
-            TokenType::Bang => "BANG",
-            TokenType::BangEqual => "BANG_EQUAL",
-            TokenType::Equal => "EQUAL",
-            TokenType::EqualEqual => "EQUAL_EQUAL",
-            TokenType::Greater => "GREATER",
-            TokenType::GreaterEqual => "GREATER_EQUAL",
-            TokenType::Less => "LESS",
-            TokenType::LessEqual => "LESS_EQUAL",
-            TokenType::Identifier => "IDENTIFIER",
-            TokenType::Str => "STRING",
-            TokenType::Number => "NUMBER",
-            TokenType::And => "AND",
-            TokenType::Class => "CLASS",
-            TokenType::Else => "ELSE",
-            TokenType::False => "FALSE",
-            TokenType::Fun => "FUN",
-            TokenType::For => "FOR",
-            TokenType::If => "IF",
-            TokenType::Nil => "NIL",
-            TokenType::Or => "OR",
-            TokenType::Print => "PRINT",
-            TokenType::Return => "RETURN",
-            TokenType::Super => "SUPER",
-            TokenType::This => "THIS",
-            TokenType::True => "TRUE",
-            TokenType::Var => "VAR",
-            TokenType::While => "WHILE",
-            TokenType::Eof => "EOF",
-        };
 
-        String::from(val)
+impl fmt::Display for TokenType {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "{}",
+            match self {
+                TokenType::LeftParen => "LEFT_PAREN",
+                TokenType::RightParen => "RIGHT_PAREN",
+                TokenType::LeftBrace => "LEFT_BRACE",
+                TokenType::RightBrace => "RIGHT_BRACE",
+                TokenType::Comma => "COMMA",
+                TokenType::Period => "DOT",
+                TokenType::Minus => "MINUS",
+                TokenType::Plus => "PLUS",
+                TokenType::Semicolon => "SEMICOLON",
+                TokenType::Slash => "SLASH",
+                TokenType::Star => "STAR",
+                TokenType::Bang => "BANG",
+                TokenType::BangEqual => "BANG_EQUAL",
+                TokenType::Equal => "EQUAL",
+                TokenType::EqualEqual => "EQUAL_EQUAL",
+                TokenType::Greater => "GREATER",
+                TokenType::GreaterEqual => "GREATER_EQUAL",
+                TokenType::Less => "LESS",
+                TokenType::LessEqual => "LESS_EQUAL",
+                TokenType::Identifier => "IDENTIFIER",
+                TokenType::Str => "STRING",
+                TokenType::Number => "NUMBER",
+                TokenType::And => "AND",
+                TokenType::Class => "CLASS",
+                TokenType::Else => "ELSE",
+                TokenType::False => "FALSE",
+                TokenType::Fun => "FUN",
+                TokenType::For => "FOR",
+                TokenType::If => "IF",
+                TokenType::Nil => "NIL",
+                TokenType::Or => "OR",
+                TokenType::Print => "PRINT",
+                TokenType::Return => "RETURN",
+                TokenType::Super => "SUPER",
+                TokenType::This => "THIS",
+                TokenType::True => "TRUE",
+                TokenType::Var => "VAR",
+                TokenType::While => "WHILE",
+                TokenType::Eof => "EOF",
+            }
+        )
     }
 }
 
 #[derive(Debug, Clone)]
 enum LexerError {
-    ParseError(usize, usize),
     UnexpectedToken(usize, usize, char),
     UnterminatedString(usize, usize),
 }
@@ -174,11 +159,12 @@ enum LexerError {
 impl fmt::Display for LexerError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            LexerError::ParseError(line, _) => write!(f, "[line {}] Error: Parse Error", line),
-            LexerError::UnexpectedToken(line, _, ch) => {
+            LexerError::UnexpectedToken(line, chno, ch) => {
+                let _ = chno;
                 write!(f, "[line {}] Error: Unexpected character: {}", line, ch)
             }
-            LexerError::UnterminatedString(line, _) => {
+            LexerError::UnterminatedString(line, chno) => {
+                let _ = chno;
                 write!(f, "[line {}] Error: Unterminated string.", line)
             }
         }
@@ -271,12 +257,12 @@ impl Lexer {
     }
 
     fn report_error(&mut self, err: LexerError) {
-        writeln!(io::stderr(), "{}", err).unwrap();
+        eprintln!("{}", err);
         self.errors.push(err);
     }
 
     fn has_error(&self) -> bool {
-        self.errors.len() > 0
+        !self.errors.is_empty()
     }
 
     fn peek(&self) -> Option<(usize, char)> {
@@ -327,7 +313,7 @@ impl Lexer {
 
     fn take_identifier(&mut self) -> String {
         let from = self.index;
-        while let Some((index, ch)) = self.peek() {
+        while let Some((_, ch)) = self.peek() {
             if ch != '_' && !ch.is_alphanumeric() {
                 break;
             }
@@ -346,7 +332,7 @@ impl Lexer {
             self.take_whitespace();
             let token = match self.input.chars().nth(self.index) {
                 None => {
-                    if (self.tokens.last().is_some_and(|x| *x == TokenType::Eof)) {
+                    if self.tokens.last().is_some_and(|x| *x == TokenType::Eof) {
                         None
                     } else {
                         Some(self.make_token(TokenType::Eof, String::from(""), Some(Value::Null)))
@@ -478,19 +464,11 @@ impl Lexer {
                 Some(ch) => {
                     if ch.is_numeric() {
                         let number = self.take_number();
-                        if !number.contains('.') {
-                            Some(self.make_token(
-                                TokenType::Number,
-                                number.clone(),
-                                Some(Value::Number(number.parse().unwrap())),
-                            ))
-                        } else {
-                            Some(self.make_token(
-                                TokenType::Number,
-                                number.clone(),
-                                Some(Value::Number(number.parse().unwrap())),
-                            ))
-                        }
+                        Some(self.make_token(
+                            TokenType::Number,
+                            number.clone(),
+                            Some(Value::Number(number.parse().unwrap())),
+                        ))
                     } else if ch.is_alphabetic() || ch == '_' {
                         let ident = self.take_identifier();
                         let token_type = match ident.as_str() {
@@ -542,9 +520,6 @@ impl Lexer {
         }
     }
 }
-
-//// PARSER
-///
 
 #[derive(Debug, Clone)]
 enum Expr {
@@ -754,7 +729,6 @@ impl fmt::Display for ParserError {
                 "[line {}] Error at '{:?}': Expected identifier.",
                 token.line, token.loxme,
             ),
-            _ => write!(f, ""),
         }
     }
 }
@@ -781,21 +755,12 @@ impl Parser {
         let token = self.tokens.get(self.tokens_index);
         self.tokens_index += 1;
 
-        if token.is_some() {
-            return Some(token.unwrap().clone());
-        }
-
-        return None;
+        token.map(|token| token.to_owned())
     }
 
     fn peek(&mut self) -> Option<Token> {
         let token = self.tokens.get(self.tokens_index);
-
-        if token.is_some() {
-            return Some(token.unwrap().clone());
-        }
-
-        return None;
+        token.map(|token| token.to_owned())
     }
 
     pub fn take_until(
@@ -1086,7 +1051,7 @@ impl Parser {
             }
             TokenType::If => {
                 let next = self.next();
-                if next.is_none() || next.clone().unwrap().to_owned() != TokenType::LeftParen {
+                if next.is_none() || next.clone().unwrap() != TokenType::LeftParen {
                     return Err(ParserError::MissingToken(
                         TokenType::LeftParen,
                         next.clone().unwrap_or(token).line,
@@ -1181,7 +1146,7 @@ impl Parser {
             }
             TokenType::While => {
                 let next = self.next();
-                if next.is_none() || next.clone().unwrap().to_owned() != TokenType::LeftParen {
+                if next.is_none() || next.clone().unwrap() != TokenType::LeftParen {
                     return Err(ParserError::MissingToken(
                         TokenType::LeftParen,
                         next.clone().unwrap_or(token).line,
@@ -1223,7 +1188,9 @@ impl Parser {
     }
 
     pub fn parse(&mut self) -> Result<Vec<Expr>, ParserError> {
-        while let expr = self.parse_one(0)? {
+        loop {
+            let expr = self.parse_one(0)?;
+
             if let Some(expr) = expr {
                 self.exprs.push(expr);
             }
@@ -1251,7 +1218,6 @@ impl fmt::Display for EvaluationError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Self::NumericOperands(line) => write!(f, "[line {line}]: Operands must be a number."),
-            _ => write!(f, ""),
         }
     }
 }
@@ -1284,7 +1250,6 @@ impl fmt::Display for RuntimeError {
                 "[line {}] Error at '{:?}': Undefined Variable.",
                 token.line, token.loxme,
             ),
-            _ => write!(f, ""),
         }
     }
 }
@@ -1567,7 +1532,7 @@ impl Runtime {
 fn main() -> Result<(), Box<dyn Error>> {
     let args: Vec<String> = env::args().collect();
     if args.len() < 3 {
-        writeln!(io::stderr(), "Usage: {} tokenize <filename>", args[0]).unwrap();
+        eprintln!("Usage: {} tokenize <filename>", args[0]);
         return Ok(());
     }
 
@@ -1577,10 +1542,10 @@ fn main() -> Result<(), Box<dyn Error>> {
     match command.as_str() {
         "tokenize" => {
             // You can use print statements as follows for debugging, they'll be visible when running tests.
-            writeln!(io::stderr(), "Logs from your program will appear here!").unwrap();
+            eprintln!("Logs from your program will appear here!");
 
             let file_contents = fs::read_to_string(filename).unwrap_or_else(|_| {
-                writeln!(io::stderr(), "Failed to read file {}", filename).unwrap();
+                eprintln!("Failed to read file {}", filename);
                 String::new()
             });
 
@@ -1595,7 +1560,7 @@ fn main() -> Result<(), Box<dyn Error>> {
         }
         "parse" => {
             let file_contents = fs::read_to_string(filename).unwrap_or_else(|_| {
-                writeln!(io::stderr(), "Failed to read file {}", filename).unwrap();
+                eprintln!("Failed to read file {}", filename);
                 String::new()
             });
 
@@ -1611,13 +1576,13 @@ fn main() -> Result<(), Box<dyn Error>> {
                 parser.dump();
             } else {
                 let res = res.err().unwrap();
-                writeln!(io::stderr(), "{res}").unwrap();
+                eprintln!("{res}");
                 std::process::exit(65);
             }
         }
         "evaluate" => {
             let file_contents = fs::read_to_string(filename).unwrap_or_else(|_| {
-                writeln!(io::stderr(), "Failed to read file {}", filename).unwrap();
+                eprintln!("Failed to read file {}", filename);
                 String::new()
             });
 
@@ -1631,27 +1596,27 @@ fn main() -> Result<(), Box<dyn Error>> {
 
             if res.is_err() {
                 let res = res.err().unwrap();
-                writeln!(io::stderr(), "{res}").unwrap();
+                eprintln!("{res}");
                 std::process::exit(65);
             }
 
             let evaluated = evaluate(parser.exprs);
 
             if evaluated.is_err() {
-                writeln!(io::stderr(), "{}", evaluated.err().unwrap()).unwrap();
+                eprintln!("{}", evaluated.err().unwrap());
                 std::process::exit(70);
             }
         }
         "run" => {
             let file_contents = fs::read_to_string(filename).unwrap_or_else(|_| {
-                writeln!(io::stderr(), "Failed to read file {}", filename).unwrap();
+                eprintln!("Failed to read file {}", filename);
                 String::new()
             });
 
             let mut lexer = Lexer::new(file_contents);
             let _ = lexer.tokenize();
             if lexer.has_error() {
-                writeln!(io::stderr(), "lexer error").unwrap();
+                eprintln!("lexer error");
                 std::process::exit(65);
             }
             let mut parser = Parser::new(lexer.tokens);
@@ -1659,7 +1624,7 @@ fn main() -> Result<(), Box<dyn Error>> {
 
             if res.is_err() {
                 let res = res.err().unwrap();
-                writeln!(io::stderr(), "{res}").unwrap();
+                eprintln!("{res}");
                 std::process::exit(65);
             }
 
@@ -1668,12 +1633,12 @@ fn main() -> Result<(), Box<dyn Error>> {
             let run_state = runtime.run();
 
             if run_state.is_err() {
-                writeln!(io::stderr(), "runtime {}", run_state.err().unwrap()).unwrap();
+                eprintln!("runtime {}", run_state.err().unwrap());
                 std::process::exit(70)
             }
         }
         _ => {
-            writeln!(io::stderr(), "Unknown command: {}", command).unwrap();
+            eprintln!("Unknown command: {}", command);
         }
     }
 
