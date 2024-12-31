@@ -1214,9 +1214,8 @@ impl Parser {
 
                 let inner = self.take_until(TokenType::LeftParen, TokenType::RightParen, false)?;
 
-                let mut clauses = Vec::<Expr>::with_capacity(3);
+                let mut clauses = Vec::<Option<Expr>>::with_capacity(3);
                 let mut pieces = inner.split(|t| t.token_type == TokenType::Semicolon);
-                let mut i = 0;
                 while let Some(tokens) = pieces.next() {
                     let mut tokens = tokens.to_vec();
                     tokens.push(Token::new(
@@ -1225,16 +1224,9 @@ impl Parser {
                         Some(Value::Null),
                         token.line,
                     ));
+
                     let expr = Parser::new(tokens.to_vec()).parse()?;
-
-                    if expr.is_empty() {
-                        i += 1;
-                        continue;
-                    }
-
-                    // >1 should probs error?
-                    clauses.insert(i, expr.first().unwrap().to_owned());
-                    i += 1;
+                    clauses.push(expr.first().map(|t| t.to_owned()));
                 }
 
                 let expr = self.parse_one(depth + 1)?;
@@ -1250,9 +1242,9 @@ impl Parser {
 
                 Some(Expr::For(
                     token,
-                    Box::new(clauses.first().map(|t| t.to_owned())),
-                    Box::new(clauses.get(1).map(|t| t.to_owned())),
-                    Box::new(clauses.get(2).map(|t| t.to_owned())),
+                    Box::new(clauses.first().unwrap().clone()),
+                    Box::new(clauses.get(1).unwrap().clone()),
+                    Box::new(clauses.get(2).unwrap().clone()),
                     Box::new(expr),
                 ))
             }
